@@ -1,0 +1,15 @@
+[theme]
+base = "light"
+primaryColor = "#841919"
+backgroundColor = "#F2F3ED"
+secondaryBackgroundColor = "#E8E4DC"
+textColor = "#4D0000"
+font = "Inter, system-ui, sans-serif"
+headingFont = "'Cormorant Garamond', Georgia, serif"
+baseRadius = "12px"
+
+[client]
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false

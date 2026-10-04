@@ -1,0 +1,9 @@
+requests
+torch
+transformers
+pillow
+pandas
+numpy
+streamlit
+altair
+pyarrow
