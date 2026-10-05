@@ -30,6 +30,7 @@ import argparse
 import hashlib
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 from PIL import Image
@@ -76,7 +77,8 @@ def import_show(folder: Path, designer: str, season: str, page_url: str | None) 
 
 def vogue_url(designer: str, season: str) -> str:
     """Default link-out, e.g. ('Miu Miu', 'Spring 2027 Ready-to-Wear') -> vogue.com/fashion-shows/spring-2027-ready-to-wear/miu-miu"""
-    slug = lambda t: re.sub(r"[^a-z0-9]+", "-", t.lower()).strip("-")
+    ascii_ = lambda t: unicodedata.normalize("NFKD", t).encode("ascii", "ignore").decode()  # Hermès -> Hermes
+    slug = lambda t: re.sub(r"[^a-z0-9]+", "-", ascii_(t).lower()).strip("-")
     return f"https://www.vogue.com/fashion-shows/{slug(season)}/{slug(designer)}"
 
 

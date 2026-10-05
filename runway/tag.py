@@ -108,6 +108,10 @@ def main():
     if args.rescore is not None:
         rescore(conn, args.rescore or list(GROUPS))
         return
+    # Personal looks also get standard-CLIP scores for the Latest season page (no-op when up to date).
+    from .latest import score_personal
+    if n := score_personal(conn):
+        print(f"Latest season: scored {n} personal looks with standard CLIP.", flush=True)
     if args.retag:
         conn.execute("DELETE FROM tags")
         conn.execute("UPDATE looks SET is_runway = NULL")

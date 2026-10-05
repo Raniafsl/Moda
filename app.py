@@ -7,7 +7,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from runway import contact, trends, ui
+from runway import contact, latest, trends, ui
 from runway.sources import TIERS
 from runway.db import ROOT
 from runway.vocab import GROUPS, display
@@ -188,8 +188,107 @@ def trends_page():
         )
 
 
+@st.cache_data(ttl=300)
+def cached_compare(group: str, label: str) -> dict | None:
+    return latest.compare(group, label)
+
+
+def season_chart(r: dict) -> alt.Chart:
+    kind, year = r["kind"], r["year"]
+    hist = r["series"].assign(season=lambda d: kind + " " + d.year.astype(str), which="history")
+    now = pd.DataFrame({"year": [year], "share": [r["latest"]], "houses": [r["n_shows"]],
+                        "season": [f"{kind} {year}"], "which": ["latest"]})
+    # Empty slots for seasons with no data, so the gap before the latest season is visible.
+    gap = pd.DataFrame({"year": r["missing_years"], "share": None, "houses": None,
+                        "season": [f"{kind} {y}" for y in r["missing_years"]], "which": "history"})
+    df = pd.concat([hist, gap, now], ignore_index=True)
+    return (
+        alt.Chart(df)
+        .mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
+        .encode(
+            x=alt.X("season:N", sort=list(df.season), title=None, axis=alt.Axis(labelAngle=-45)),
+            y=alt.Y("share:Q", title=None, axis=alt.Axis(format="%", tickCount=5)),
+            color=alt.Color("which:N", scale=alt.Scale(domain=["history", "latest"], range=["#DCD3C8", ui.PRIMARY]), legend=None),
+            tooltip=[alt.Tooltip("season:N"), alt.Tooltip("share:Q", format=".1%"), alt.Tooltip("houses:Q", title="houses")],
+        )
+        .properties(height=320)
+        .configure(background="transparent", font="Inter")
+        .configure_view(strokeWidth=0)
+        .configure_axis(gridColor=ui.GRID, domainColor=ui.SECONDARY, tickColor=ui.SECONDARY,
+                        labelColor=ui.ACCENT, labelFontSize=11, gridDash=[2, 4])
+        .configure_axisX(grid=False)
+    )
+
+
+def latest_page():
+    if not trends.vogue_available():
+        st.info("The Latest season page compares your saved shows with the Vogue Runway archive - build it first "
+                "(`python -m runway.vogue build`).")
+        return
+    with st.sidebar:
+        group = st.radio("Attribute", list(GROUPS), index=list(GROUPS).index("pattern"), format_func=str.capitalize)
+    labels = GROUPS[group][1]
+    probe = cached_compare(group, labels[0])
+    if probe is None:
+        st.html(ui.section("Latest season", "Nothing saved yet"))
+        st.info("Save a show's looks into a folder, then run `python -m runway.personal import-show <folder> "
+                "--designer \"Miu Miu\" --season \"Spring 2027 Ready-to-Wear\"` and `python -m runway.tag`.")
+        return
+
+    top = probe["standouts"]
+    default = "a floral print" if "a floral print" in labels else (top.label.iloc[0] if len(top) else labels[0])
+    pick = st.selectbox("Label", labels, index=labels.index(default), format_func=display)
+    r = cached_compare(group, pick)
+    kind, year = r["kind"], r["year"]
+    short = f"{ {'Spring': 'SS', 'Fall': 'FW'}.get(kind, kind + ' ') }{str(year)[-2:]}"
+    name = display(pick)
+
+    st.html(ui.section(f"Latest season · {r['n_shows']} shows", f"{r['season']} vs. history",
+                       f"Your saved shows, scored with standard CLIP like the Vogue archive, against the same "
+                       f"houses' own past {kind} seasons."))
+    ratio = r["latest"] / r["last_share"] if r["last_share"] else None
+    st.html(ui.stat_cards([
+        (ui.count(r["latest"] * 100, 1, "%"), f"{name} in {short}", f"mean of {r['n_shows']} shows, one vote each"),
+        (("×" + ui.count(ratio, 2)) if ratio else "–", f"vs {kind} {r['last_year']}", "same houses, last season on record"),
+        (f"{ui.count(r['n_up'])}<small>/{r['n_hist']}</small>", "Houses up ≥20%", f"{r['n_down']} down, against their own average"),
+    ]))
+    bits = []
+    if r["highest_since"]:
+        bits.append(f"Highest {kind} level of {name} for these houses since {kind} {r['highest_since']}.")
+    elif r["last_year"]:
+        bits.append(f"Higher than any {kind} season on record for these houses.")
+    if r["missing_years"]:
+        m = r["missing_years"]
+        bits.append(f"No data for {kind} {m[0]}{'–' + str(m[-1]) if len(m) > 1 else ''}: the Vogue archive ends there, "
+                    "so this can't say when the change began.")
+    bits.append(f"You chose these {r['n_shows']} shows; add more to make the comparison sturdier.")
+    st.html(ui.note(" ".join(bits)))
+
+    st.html(ui.section(f"Same houses, every {kind}", f"{name} across {kind} seasons",
+                       "Each bar averages the houses that showed that season (at least half of them)."))
+    st.altair_chart(season_chart(r), use_container_width=True)
+
+    st.html(ui.section("House by house", "Against their own history",
+                       f"Each new show vs the average of that house's last five {kind} seasons on record."))
+    st.html(ui.house_cards(r["houses"], short, kind))
+
+    st.html(ui.section("The looks", f"{short} on the runway", f"Your saved looks, ranked by how {name} the model finds them."))
+    houses = sorted(r["houses"].designer)
+    view = st.selectbox("Show", [f"Most {name}"] + houses, label_visibility="collapsed")
+    looks = latest.latest_looks(group, pick, None if view.startswith("Most ") else view)
+    st.html(ui.latest_gallery(looks, ROOT, name))
+    if not view.startswith("Most "):
+        st.caption(f"All {len(looks)} looks from {view}, most {name} first.")
+
+    s = r["standouts"].rename(columns={"now": "recent", "base": "baseline"})
+    st.html(ui.section("What stands out", f"{group.capitalize()} in {short}",
+                       f"Every label, this season vs the same houses' last five {kind} seasons."))
+    st.html(ui.movers(list(s[s.lift > 1].head(4).itertuples()), list(s[s.lift < 1].tail(4).iloc[::-1].itertuples()), display))
+
+
 nav = st.navigation([
     st.Page(trends_page, title="Trends", icon=":material/trending_up:", default=True),
+    st.Page(latest_page, title="Latest season", icon=":material/new_releases:", url_path="latest"),
     st.Page(contact.page, title="Get in touch", icon=":material/mail:", url_path="contact"),
 ])
 nav.run()

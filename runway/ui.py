@@ -69,6 +69,7 @@ html, body {{ font-family: {BODY_FONT}; }}  /* widgets get Inter via theme.font;
 .moda-stats {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; perspective: 900px; }}
 .moda-stat {{ background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 1.3rem 1.4rem 1.2rem; box-shadow: var(--shadow); }}
 .moda-stat .num {{ font-family: {DISPLAY_FONT}; font-size: 3.1rem; line-height: 1; color: var(--primary); font-variant-numeric: lining-nums tabular-nums; transform: translateZ(30px); }}
+.moda-stat .num small {{ font-size: 1.5rem; color: var(--accent); margin-left: .1rem; }}
 .moda-stat .lbl {{ font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-top: .55rem; font-weight: 600; }}
 .moda-stat .sub {{ font-size: .82rem; color: var(--secondary); margin-top: .2rem; }}
 
@@ -89,7 +90,11 @@ html, body {{ font-family: {BODY_FONT}; }}  /* widgets get Inter via theme.font;
 .moda-bar .fill.then {{ background: var(--secondary); opacity: .55; }}
 .moda-bar .fill.now.up {{ background: var(--rising); }}
 .moda-bar .fill.now.down {{ background: var(--primary); }}
+.moda-mnote {{ font-size: .72rem; color: var(--secondary); margin-top: .45rem; }}
 .moda-bar .v {{ text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }}
+
+.moda-houses {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: .9rem; perspective: 1000px; }}
+.moda-houses .moda-mover {{ margin-bottom: 0; }}
 
 /* ---------- comebacks ---------- */
 @keyframes moda-bar {{ from {{ transform: scaleY(0); }} to {{ transform: scaleY(1); }} }}
@@ -222,7 +227,8 @@ def stat_cards(stats: list[tuple[str, str, str]]) -> str:
     return f'<div class="moda-stats">{cards}</div>'
 
 
-def _mover(name: str, then: float, now: float, lift: float, up: bool, scale: float, i: int) -> str:
+def _mover(name: str, then: float, now: float, lift: float, up: bool, scale: float, i: int,
+           labels: tuple[str, str] = ("Before", "Recently"), note: str = "") -> str:
     cls = "up" if up else "down"
     arrow = "▲" if up else "▼"
     w_then, w_now = then / scale * 100, now / scale * 100
@@ -231,9 +237,9 @@ def _mover(name: str, then: float, now: float, lift: float, up: bool, scale: flo
       <div class="top"><span class="name">{esc(name)}</span>
         <span class="moda-chip {cls}">{arrow} ×{count(lift, 2)}</span></div>
       <div class="moda-bars">
-        <div class="moda-bar"><span>Before</span><div class="track"><div class="fill then" style="width:{w_then:.1f}%;--i:{i}"></div></div><span class="v">{then:.1%}</span></div>
-        <div class="moda-bar"><span>Recently</span><div class="track"><div class="fill now {cls}" style="width:{w_now:.1f}%;--i:{i}"></div></div><span class="v">{now:.1%}</span></div>
-      </div>
+        <div class="moda-bar"><span>{labels[0]}</span><div class="track"><div class="fill then" style="width:{w_then:.1f}%;--i:{i}"></div></div><span class="v">{then:.1%}</span></div>
+        <div class="moda-bar"><span>{labels[1]}</span><div class="track"><div class="fill now {cls}" style="width:{w_now:.1f}%;--i:{i}"></div></div><span class="v">{now:.1%}</span></div>
+      </div>{f'<div class="moda-mnote">{esc(note)}</div>' if note else ''}
     </div>"""
 
 
@@ -272,6 +278,18 @@ def comebacks(rows, share, display, recent_years: int) -> str:
     return f'<div class="moda-comebacks">{"".join(cards)}</div>'
 
 
+def house_cards(houses, season_short: str, kind: str) -> str:
+    """Latest season: one card per house, its new show against its own recent average."""
+    rows = houses[houses.seasons > 0]
+    scale = max([max(r.base, r.now) for r in rows.itertuples()] + [1e-9])
+    cards = "".join(
+        _mover(r.designer, r.base, r.now, r.lift, r.lift >= 1, scale, i, labels=("Own avg", season_short),
+               note=f"avg of {r.seasons} {kind} seasons, {r.first}–{str(r.last)[-2:]}" + (" · old baseline" if r.last < 2020 else ""))
+        for i, r in enumerate(rows.itertuples())
+    )
+    return f'<div class="moda-houses">{cards}</div>'
+
+
 @lru_cache(maxsize=512)
 def _data_uri(path: str) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(Path(path).read_bytes()).decode()
@@ -281,6 +299,10 @@ def coverage_note(personal: int) -> str:
     extra = f" Includes {personal:,} looks from your personal archive (analysed, never displayed)." if personal else ""
     return (f'<div class="moda-note moda-in" style="--i:6">A sample, not the whole runway: professional show photography '
             f'is licensed, so this draws on openly licensed photos, which cover major houses unevenly.{esc(extra)}</div>')
+
+
+def note(text: str, i: int = 6) -> str:
+    return f'<div class="moda-note moda-in" style="--i:{i}">{esc(text)}</div>'
 
 
 def vogue_note() -> str:
@@ -309,6 +331,24 @@ def _remote_card(l, label: str, i: int) -> str:
         f'<figcaption class="cap"><b>{esc(l.designer)}</b>{esc(l.season)} · {l.score:.0%} {esc(label)}<br>'
         f'Photo: <a href="{esc(l.page_url)}" target="_blank" rel="noopener">Vogue Runway ↗</a></figcaption></figure>'
     )
+
+
+def latest_gallery(looks, root: Path, label: str) -> str:
+    """Your saved looks - shown from the local copies in data/personal (never committed to git).
+    If a file is missing (e.g. on a deployment without your data), the card falls back to a link."""
+    cards = []
+    for i, l in enumerate(looks.itertuples()):
+        path = root / l.local_path
+        link = f'<a href="{esc(l.page_url)}" target="_blank" rel="noopener">Collection ↗</a>' if l.page_url else ""
+        if not path.exists():
+            cards.append(_private_card(l, label, i))
+            continue
+        cards.append(
+            f'<figure class="moda-look moda-tilt moda-in" style="--i:{min(i, 12)};margin:0" data-max="9">'
+            f'<img src="{_data_uri(str(path))}" alt="{esc(l.designer)} {esc(l.season)}" loading="lazy">'
+            f'<figcaption class="cap"><b>{esc(l.designer)}</b>{l.score:.0%} {esc(label)}<br>{link}</figcaption></figure>'
+        )
+    return f'<div class="moda-gallery">{"".join(cards)}</div>'
 
 
 def gallery(looks, root: Path, label: str) -> str:
