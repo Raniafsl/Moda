@@ -84,7 +84,7 @@ def top_looks(group: str, label: str, year: int | None = None, min_runway: float
     conn = connect()
     where, tier_params = _tier_sql(tiers)
     sql = f"""
-        SELECT l.pageid, l.year, l.title, l.page_url, l.artist, l.license, l.local_path, l.show,
+        SELECT l.pageid, l.year, l.title, l.page_url, l.artist, l.license, l.local_path, l.thumb_url, l.show,
                l.private, l.designer, l.season, t.score
         FROM tags t JOIN looks l USING (pageid)
         WHERE t.attr_group = ? AND t.label = ? AND l.is_runway >= ? AND {where}

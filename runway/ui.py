@@ -340,6 +340,8 @@ def latest_gallery(looks, root: Path, label: str) -> str:
     for i, l in enumerate(looks.itertuples()):
         path = root / l.local_path
         link = f'<a href="{esc(l.page_url)}" target="_blank" rel="noopener">Collection ↗</a>' if l.page_url else ""
+        if l.artist:
+            link = f"Photo: {esc(l.artist)}" + (f" · {link}" if link else "")
         if not path.exists():
             cards.append(_private_card(l, label, i))
             continue
@@ -349,6 +351,12 @@ def latest_gallery(looks, root: Path, label: str) -> str:
             f'<figcaption class="cap"><b>{esc(l.designer)}</b>{l.score:.0%} {esc(label)}<br>{link}</figcaption></figure>'
         )
     return f'<div class="moda-gallery">{"".join(cards)}</div>'
+
+
+def _image_src(l, root: Path) -> str:
+    """Local thumbnail if we have it, else Wikimedia's own copy (deployments don't ship the 470 MB of thumbnails)."""
+    path = root / l.local_path if l.local_path else None
+    return _data_uri(str(path)) if path and path.exists() else esc(getattr(l, "thumb_url", "") or "")
 
 
 def gallery(looks, root: Path, label: str) -> str:
@@ -363,7 +371,7 @@ def gallery(looks, root: Path, label: str) -> str:
         credit = esc(l.artist or "Unknown")
         cards.append(
             f'<figure class="moda-look moda-tilt moda-in" style="--i:{i};margin:0" data-max="9">'
-            f'<img src="{_data_uri(str(root / l.local_path))}" alt="{esc(label)} look, {l.year}" loading="lazy">'
+            f'<img src="{_image_src(l, root)}" alt="{esc(label)} look, {l.year}" loading="lazy">'
             f'<figcaption class="cap"><b>{l.year}</b>{l.score:.0%} {esc(label)}<br>'
             f'<a href="{esc(l.page_url)}" target="_blank" rel="noopener">{credit}</a> · {esc(l.license or "")}</figcaption></figure>'
         )

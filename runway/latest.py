@@ -12,8 +12,6 @@ import unicodedata
 
 import numpy as np
 import pandas as pd
-import torch
-from PIL import Image
 
 from .db import ROOT, connect
 
@@ -59,6 +57,8 @@ def score_personal(conn=None, batch: int = 32) -> int:
     ).fetchall()
     if not todo:
         return 0
+    import torch
+    from PIL import Image
     from transformers import CLIPModel, CLIPProcessor
 
     from .vogue import MODEL_ID, softmax, text_features
@@ -177,7 +177,7 @@ def latest_looks(group: str, label: str, designer: str | None = None, n: int = 1
         return pd.DataFrame()
     season = shows.season.iloc[0]
     df = pd.read_sql_query(
-        """SELECT l.pageid, l.designer, l.season, l.year, l.page_url, l.local_path, c.score
+        """SELECT l.pageid, l.designer, l.season, l.year, l.page_url, l.local_path, l.artist, c.score
            FROM clip_tags c JOIN looks l USING (pageid)
            WHERE l.source = 'personal' AND l.season = ? AND c.attr_group = ? AND c.label = ?
            ORDER BY c.score DESC""",

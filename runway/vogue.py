@@ -23,8 +23,6 @@ import unicodedata
 
 import numpy as np
 import pandas as pd
-import torch
-from transformers import CLIPModel, CLIPProcessor
 
 from .db import DATA_DIR
 from .vocab import GROUPS
@@ -65,6 +63,8 @@ def load_meta() -> pd.DataFrame:
 
 
 def text_features(model, processor, device) -> dict[str, tuple[list[str], np.ndarray]]:
+    import torch
+
     out = {}
     with torch.no_grad():
         for group, (template, labels) in GROUPS.items():
@@ -81,6 +81,9 @@ def softmax(x: np.ndarray) -> np.ndarray:
 
 
 def build() -> None:
+    import torch
+    from transformers import CLIPModel, CLIPProcessor
+
     meta = load_meta()
     emb = np.load(EMB, mmap_mode="r")
     assert len(emb) == len(pd.read_parquet(META, columns=["key"])), "embeddings and metadata have different lengths"
@@ -138,6 +141,9 @@ def build() -> None:
 def check(n: int = 3000) -> None:
     """Embeddings and metadata must be in the same row order. Vogue's own tags give a check:
     looks tagged 'Evening Dress' should score far higher on 'evening gown' than other looks."""
+    import torch
+    from transformers import CLIPModel, CLIPProcessor
+
     df = pd.read_parquet(META, columns=["section", "tags"])
     emb = np.load(EMB, mmap_mode="r")
     print("rows:", len(df), "embeddings:", emb.shape, emb.dtype)

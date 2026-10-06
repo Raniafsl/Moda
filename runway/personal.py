@@ -13,7 +13,7 @@ Lay your saved looks out as  <archive>/<Designer>/<Season>/<any>.jpg, e.g.
           ...
 
     python -m runway.personal import ~/Pictures/moda-archive
-    python -m runway.personal import-show ~/Downloads/miumiu-ss27 --designer "Miu Miu" --season "Spring 2027 Ready-to-Wear"
+    python -m runway.personal import-show ~/Downloads/miumiu-ss27 --designer "Miu Miu" --season "Spring 2027 Ready-to-Wear" --credit Tagwalk
     python -m runway.tag                       # tags the new looks
     python -m runway.personal clear            # remove every personal look again
 
@@ -67,11 +67,11 @@ def import_archive(archive: Path) -> None:
     print(f"Imported {added} looks ({skipped} already there). Run `python -m runway.tag` next.")
 
 
-def import_show(folder: Path, designer: str, season: str, page_url: str | None) -> None:
+def import_show(folder: Path, designer: str, season: str, page_url: str | None, credit: str = "") -> None:
     """One flat folder of looks from a single show."""
     if page_url is None:
         page_url = vogue_url(designer, season)
-    added, skipped = import_folder(connect(), folder, designer, season, page_url)
+    added, skipped = import_folder(connect(), folder, designer, season, page_url, credit)
     print(f"{designer} {season}: imported {added} looks ({skipped} already there). Run `python -m runway.tag` next.")
 
 
@@ -82,7 +82,7 @@ def vogue_url(designer: str, season: str) -> str:
     return f"https://www.vogue.com/fashion-shows/{slug(season)}/{slug(designer)}"
 
 
-def import_folder(conn, folder: Path, designer: str, season: str, page_url: str) -> tuple[int, int]:
+def import_folder(conn, folder: Path, designer: str, season: str, page_url: str, credit: str = "") -> tuple[int, int]:
     year = show_year(season)
     if year is None:
         print(f"  skip {designer}/{season}: no year in the season name", file=sys.stderr)
@@ -109,8 +109,8 @@ def import_folder(conn, folder: Path, designer: str, season: str, page_url: str)
         conn.execute(
             """INSERT INTO looks (pageid, title, year, page_url, thumb_url, artist, license, categories,
                                   local_path, tier, show, source, private, designer, season)
-               VALUES (?, ?, ?, ?, '', '', 'personal research copy', ?, ?, 'major', ?, 'personal', 1, ?, ?)""",
-            (pid, rel, year, page_url, f"{designer}|{season}", str(dest.relative_to(ROOT)),
+               VALUES (?, ?, ?, ?, '', ?, 'personal research copy', ?, ?, 'major', ?, 'personal', 1, ?, ?)""",
+            (pid, rel, year, page_url, credit, f"{designer}|{season}", str(dest.relative_to(ROOT)),
              f"{designer} {season}", designer, season),
         )
         added += 1
@@ -139,12 +139,13 @@ def main():
     one.add_argument("--designer", required=True, help='e.g. "Miu Miu"')
     one.add_argument("--season", required=True, help='e.g. "Spring 2027 Ready-to-Wear"')
     one.add_argument("--url", help="collection page for link-outs (default: its Vogue Runway page)")
+    one.add_argument("--credit", default="", help='where the photos came from, shown on each look, e.g. "Tagwalk"')
     sub.add_parser("clear", help="remove all personal looks")
     args = ap.parse_args()
     if args.cmd == "import":
         import_archive(args.archive.expanduser())
     elif args.cmd == "import-show":
-        import_show(args.folder.expanduser(), args.designer, args.season, args.url)
+        import_show(args.folder.expanduser(), args.designer, args.season, args.url, args.credit)
     else:
         clear()
 
