@@ -96,6 +96,25 @@ html, body {{ font-family: {BODY_FONT}; }}  /* widgets get Inter via theme.font;
 .moda-houses {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: .9rem; perspective: 1000px; }}
 .moda-houses .moda-mover {{ margin-bottom: 0; }}
 
+/* ---------- colour story ---------- */
+.moda-colours {{ background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 1.2rem 1.3rem; box-shadow: var(--shadow); }}
+.moda-colours .row {{ display: grid; grid-template-columns: 9.5rem 1fr; align-items: center; gap: .9rem; margin: .35rem 0; }}
+.moda-colours .row.big {{ margin: .55rem 0; }}
+.moda-colours .who {{ font-size: .8rem; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+.moda-colours .who b {{ color: var(--primary); font-weight: 600; }}
+.moda-colours .houses {{ margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--line); }}
+.moda-palette {{ display: flex; height: 34px; border-radius: 9px; overflow: hidden; gap: 2px; }}
+.moda-palette.thin {{ height: 14px; border-radius: 5px; gap: 1px; }}
+.moda-palette span {{ transform-origin: left; animation: moda-grow .9s var(--ease) both; animation-delay: calc(var(--j, 0) * 35ms + .15s);
+  transition: filter .2s, transform .2s; }}
+.moda-palette span:hover {{ filter: brightness(1.12) saturate(1.1); transform: scaleY(1.12); }}
+.moda-legend {{ display: flex; flex-wrap: wrap; gap: .4rem 1rem; margin: .4rem 0 0 10.4rem; font-size: .78rem; color: var(--text); }}
+.moda-legend i {{ display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: .35rem; vertical-align: -1px; }}
+@media (max-width: 640px) {{
+  .moda-colours .row {{ grid-template-columns: 1fr; gap: .25rem; }}
+  .moda-legend {{ margin-left: 0; }}
+}}
+
 /* ---------- comebacks ---------- */
 @keyframes moda-bar {{ from {{ transform: scaleY(0); }} to {{ transform: scaleY(1); }} }}
 .moda-comebacks {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; perspective: 1000px; }}
@@ -137,7 +156,7 @@ html, body {{ font-family: {BODY_FONT}; }}  /* widgets get Inter via theme.font;
 .moda-foot {{ color: var(--secondary); font-size: .8rem; margin-top: .4rem; }}
 
 @media (prefers-reduced-motion: reduce) {{
-  .moda-in, .moda-rule, .moda-bar .fill, .moda-comeback .spark span, [data-testid="stVegaLiteChart"] {{ animation: none !important; opacity: 1 !important; transform: none !important; }}
+  .moda-in, .moda-rule, .moda-bar .fill, .moda-comeback .spark span, .moda-palette span, [data-testid="stVegaLiteChart"] {{ animation: none !important; opacity: 1 !important; transform: none !important; }}
   .moda-tilt, .moda-look img, .moda-look .cap {{ transition: none !important; }}
 }}
 </style>
@@ -288,6 +307,34 @@ def house_cards(houses, season_short: str, kind: str) -> str:
         for i, r in enumerate(rows.itertuples())
     )
     return f'<div class="moda-houses">{cards}</div>'
+
+
+def _segments(shares, swatch: dict, display, delay: int = 0) -> str:
+    total = float(shares.sum()) or 1.0
+    return "".join(
+        f'<span style="flex:{v / total:.4f};background:{swatch.get(label, "#bbb")};--j:{delay + j}" '
+        f'title="{esc(display(label))} {v / total:.0%}"></span>'
+        for j, (label, v) in enumerate(shares.sort_values(ascending=False).items()) if v / total >= 0.005
+    )
+
+
+def colour_story(before, now, per_house, swatch: dict, display, before_label: str, now_label: str) -> str:
+    """Palettes as real swatches: the same houses' recent average vs. the new season, then house by house."""
+    legend = "".join(
+        f'<span><i style="background:{swatch.get(l, "#bbb")}"></i>{esc(display(l))} {v / now.sum():.0%}</span>'
+        for l, v in now.sort_values(ascending=False).head(6).items()
+    )
+    rows = "".join(
+        f'<div class="row"><span class="who">{esc(d)}</span><div class="moda-palette thin">{_segments(r, swatch, display, i * 3)}</div></div>'
+        for i, (d, r) in enumerate(per_house.iterrows())
+    )
+    return f"""
+    <div class="moda-colours moda-in" style="--i:2">
+      <div class="row big"><span class="who">{esc(before_label)}</span><div class="moda-palette">{_segments(before, swatch, display)}</div></div>
+      <div class="row big"><span class="who"><b>{esc(now_label)}</b></span><div class="moda-palette">{_segments(now, swatch, display, 4)}</div></div>
+      <div class="moda-legend">{legend}</div>
+      <div class="houses">{rows}</div>
+    </div>"""
 
 
 @lru_cache(maxsize=512)

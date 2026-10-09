@@ -22,6 +22,8 @@ SWATCH = {
     "green": "#5E8B5A", "blue": "#3E78B8", "navy": "#26375E", "purple": "#7D5A9C",
     "brown": "#7A5236", "metallic silver or gold": "#B89B4A", "multicoloured": "#C77DB0",
 }
+# Palette bars can show "multicoloured" as what it is.
+PALETTE_SWATCH = {**SWATCH, "multicoloured": "linear-gradient(90deg,#B8322A,#E3B92E,#5E8B5A,#3E78B8,#7D5A9C)"}
 
 
 @st.cache_data(ttl=300)  # data keeps arriving while ingest/tag run
@@ -225,8 +227,9 @@ def latest_page():
         st.info("The Latest season page compares your saved shows with the Vogue Runway archive - build it first "
                 "(`python -m runway.vogue build`).")
         return
-    with st.sidebar:
-        group = st.radio("Attribute", list(GROUPS), index=list(GROUPS).index("pattern"), format_func=str.capitalize)
+    a, b = st.columns([3, 2], vertical_alignment="bottom")
+    with a:
+        group = st.segmented_control("Attribute", list(GROUPS), default="pattern", format_func=str.capitalize) or "pattern"
     labels = GROUPS[group][1]
     probe = cached_compare(group, labels[0])
     if probe is None:
@@ -237,7 +240,8 @@ def latest_page():
 
     top = probe["standouts"]
     default = "a floral print" if "a floral print" in labels else (top.label.iloc[0] if len(top) else labels[0])
-    pick = st.selectbox("Label", labels, index=labels.index(default), format_func=display)
+    with b:
+        pick = st.selectbox("Label", labels, index=labels.index(default), format_func=display, key=f"label-{group}")
     r = cached_compare(group, pick)
     kind, year = r["kind"], r["year"]
     short = f"{ {'Spring': 'SS', 'Fall': 'FW'}.get(kind, kind + ' ') }{str(year)[-2:]}"
@@ -271,6 +275,19 @@ def latest_page():
     st.html(ui.section("House by house", "Against their own history",
                        f"Each new show vs the average of that house's last five {kind} seasons on record."))
     st.html(ui.house_cards(r["houses"], short, kind))
+
+    # ---------- colour story (always shown, whatever attribute is picked) ----------
+    c = cached_compare("colour", "black")
+    yrs = c["recent_years"]
+    span = f"{kind} {yrs[0]}–{str(yrs[-1])[-2:]}" if len(yrs) else f"Earlier {kind}"
+    st.html(ui.section("Colour story", f"The {short} palette",
+                       f"Each bar is a palette: colour shares across the season's looks. Top: the same houses' "
+                       f"{kind} average for {span}. Below, house by house. Hover a band for its share."))
+    st.html(ui.colour_story(c["base_all"], c["now_all"], c["per_house"], PALETTE_SWATCH, display,
+                            f"{span} avg", f"{short} · {c['n_shows']} shows"))
+    if group != "colour":  # with Colour picked, "What stands out" below already lists these
+        cs = c["standouts"].rename(columns={"now": "recent", "base": "baseline"})
+        st.html(ui.movers(list(cs[cs.lift > 1].head(4).itertuples()), list(cs[cs.lift < 1].tail(4).iloc[::-1].itertuples()), display))
 
     st.html(ui.section("The looks", f"{short} on the runway", f"Your saved looks, ranked by how {name} the model finds them."))
     houses = sorted(r["houses"].designer)

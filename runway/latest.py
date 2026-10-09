@@ -162,6 +162,9 @@ def compare(group: str, label: str, recent: int = 5, min_share: float = 0.02) ->
         "n_up": int((with_hist.lift >= 1.2).sum()), "n_down": int((with_hist.lift <= 0.8).sum()),
         "n_hist": len(with_hist), "no_history": list(houses[houses.seasons == 0].designer),
         "missing_years": missing, "standouts": standouts,
+        # every label, unfiltered - for palettes and other whole-group views
+        "now_all": now_all, "base_all": base_all, "recent_years": recent_years,
+        "per_house": shows.pivot_table(index="designer", columns="label", values="share"),
     }
 
 
