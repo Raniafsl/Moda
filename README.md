@@ -33,10 +33,7 @@ then:
 
 That dataset was scraped from vogue.com and has no license. Moda scores its CLIP embeddings and metadata and never
 downloads the photos. The gallery hotlinks Vogue's own image URLs, credited to Vogue Runway, with each look linked to
-its collection. That still displays Condé Nast's photos, so a public deployment carries takedown risk; to switch to
-link-out cards only, set `private=1` in `trends.vogue_top_looks`. The data files are git-ignored. Don't redistribute them.
-
-Ingest and tag are both resumable, so re-run them any time to pick up new photos.
+its collection.
 
 ## How it works
 
@@ -51,7 +48,7 @@ Ingest and tag are both resumable, so re-run them any time to pick up new photos
 4. **Trend.** A label's yearly *share* is its mean probability across that year's looks.
    *Lift* compares the last N years with everything before.
 
-## Limitations (worth saying out loud in interviews)
+## Limitations 
 
 - **Sampling bias.** Commons only covers shows that volunteers photographed and uploaded.
   It skews toward some weeks and designers, and it's thin for 2020–21.
