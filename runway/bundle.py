@@ -51,6 +51,9 @@ def copy_code() -> None:
     (DEPLOY / "requirements.txt").write_text(REQUIREMENTS)
     (DEPLOY / "README.md").write_text(README)
     (DEPLOY / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
+    marker = DEPLOY / "data" / "DEPLOYED"  # tells the app it's public: hides the labelling tool
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("This copy is deployed: read-only features only.\n")
 
 
 def copy_vogue() -> None:

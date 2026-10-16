@@ -7,7 +7,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from runway import contact, latest, trends, ui
+from runway import about, accuracy, contact, latest, trends, ui
 from runway.sources import TIERS
 from runway.db import ROOT
 from runway.vocab import GROUPS, display
@@ -31,7 +31,7 @@ def cached_scores(min_runway: float, tier: str) -> pd.DataFrame:
     return trends.load_scores(min_runway, trends.tiers_upto(tier))
 
 
-def trend_chart(share: pd.DataFrame, chosen: list[str], group: str) -> alt.Chart:
+def trend_chart(share: pd.DataFrame, chosen: list[str], group: str, height: int = 400) -> alt.Chart:
     long = share[chosen].reset_index().melt("year", var_name="label", value_name="share")
     long["name"] = long.label.map(display)
     names = [display(l) for l in chosen]
@@ -55,7 +55,7 @@ def trend_chart(share: pd.DataFrame, chosen: list[str], group: str) -> alt.Chart
     ).add_params(hover)
     return (
         (lines + points)
-        .properties(height=400)
+        .properties(height=height)
         .configure(background="transparent", font="Inter")
         .configure_view(strokeWidth=0)
         .configure_legend(labelColor=ui.TEXT, labelFontSize=12, symbolStrokeWidth=3)
@@ -69,7 +69,7 @@ VOGUE, COMMONS = "Vogue Runway archive", "Open photos (Commons)"
 COLLECTIONS = ["Ready-to-Wear", "Couture", "Menswear"]
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner="Opening the Vogue Runway archive…")
 def cached_vogue(group: str, categories: tuple[str, ...]) -> pd.DataFrame:
     return trends.load_vogue(group, list(categories))
 
@@ -190,14 +190,15 @@ def trends_page():
         )
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=300, show_spinner="Comparing the latest season with history…")
 def cached_compare(group: str, label: str) -> dict | None:
     return latest.compare(group, label)
 
 
-def season_chart(r: dict) -> alt.Chart:
+def season_chart(r: dict, height: int = 320) -> alt.Chart:
     kind, year = r["kind"], r["year"]
-    hist = r["series"].assign(season=lambda d: kind + " " + d.year.astype(str), which="history")
+    hist = r["series"].assign(season=lambda d: kind + " " + d.year.astype(str),
+                              which=lambda d: d.origin.map({"vogue": "history", "saved": "saved"}))
     now = pd.DataFrame({"year": [year], "share": [r["latest"]], "houses": [r["n_shows"]],
                         "season": [f"{kind} {year}"], "which": ["latest"]})
     # Empty slots for seasons with no data, so the gap before the latest season is visible.
@@ -210,10 +211,11 @@ def season_chart(r: dict) -> alt.Chart:
         .encode(
             x=alt.X("season:N", sort=list(df.season), title=None, axis=alt.Axis(labelAngle=-45)),
             y=alt.Y("share:Q", title=None, axis=alt.Axis(format="%", tickCount=5)),
-            color=alt.Color("which:N", scale=alt.Scale(domain=["history", "latest"], range=["#DCD3C8", ui.PRIMARY]), legend=None),
+            color=alt.Color("which:N", scale=alt.Scale(domain=["history", "saved", "latest"],
+                                                       range=["#DCD3C8", "#C99A92", ui.PRIMARY]), legend=None),
             tooltip=[alt.Tooltip("season:N"), alt.Tooltip("share:Q", format=".1%"), alt.Tooltip("houses:Q", title="houses")],
         )
-        .properties(height=320)
+        .properties(height=height)
         .configure(background="transparent", font="Inter")
         .configure_view(strokeWidth=0)
         .configure_axis(gridColor=ui.GRID, domainColor=ui.SECONDARY, tickColor=ui.SECONDARY,
@@ -255,21 +257,38 @@ def latest_page():
         (ui.count(r["latest"] * 100, 1, "%"), f"{name} in {short}", f"mean of {r['n_shows']} shows, one vote each"),
         (("×" + ui.count(ratio, 2)) if ratio else "–", f"vs {kind} {r['last_year']}", "same houses, last season on record"),
         (f"{ui.count(r['n_up'])}<small>/{r['n_hist']}</small>", "Houses up ≥20%", f"{r['n_down']} down, against their own average"),
-    ]))
+    ] + ([(("×" + ui.count(p["lift"], 2)), f"vs {p['season']}", f"same {len(p['houses'])} houses, saved seasons")]
+         if (p := r.get("prev")) else [])))
     bits = []
     if r["highest_since"]:
         bits.append(f"Highest {kind} level of {name} for these houses since {kind} {r['highest_since']}.")
     elif r["last_year"]:
         bits.append(f"Higher than any {kind} season on record for these houses.")
-    if r["missing_years"]:
-        m = r["missing_years"]
-        bits.append(f"No data for {kind} {m[0]}{'–' + str(m[-1]) if len(m) > 1 else ''}: the Vogue archive ends there, "
-                    "so this can't say when the change began.")
+    partial = r.get("partial", {})
+    if m := [y for y in r["missing_years"] if y not in partial]:
+        bits.append(f"No data for {kind} {m[0]}{'–' + str(m[-1]) if len(m) > 1 else ''}: the Vogue archive ends there.")
+    for y, n in partial.items():
+        bits.append(f"{kind} {y} is partly saved ({n} of {r['n_shows']} houses), too few to chart; "
+                    f"save {max(r['n_shows'] // 2 - n, 1)} more of these houses to add it.")
+    if p := r.get("prev"):
+        above_archive = r["latest"] > (r["last_share"] or 0) * 1.2
+        change = ("a new move this season" if p["lift"] >= 1.5
+                  else "down since last season" if p["lift"] < 0.8
+                  else "a rise that began before this season" if above_archive
+                  else "little change since last season")
+        bits.append(f"Same {len(p['houses'])} houses year on year: {p['prev']:.1%} in {p['season']} → {p['now']:.1%} now "
+                    f"(×{p['lift']:.2f}, {p['up']} up, {p['down']} down) - {change}.")
     bits.append(f"You chose these {r['n_shows']} shows; add more to make the comparison sturdier.")
     st.html(ui.note(" ".join(bits)))
 
+    if (acc := accuracy.reliability(group, pick)) and acc["precision"] < 0.75:
+        st.html(ui.note(f"Accuracy check: when Moda labels a look ‘{name}’, it was right {acc['precision']:.0%} of the "
+                        f"time ({int(acc['yes'])} of {int(acc['n'])} checked). Treat this label's numbers with caution."))
+
+    saved_note = (f" Rose bars ({', '.join(f'{kind} {y}' for y in r['saved_years'])}) are seasons you saved; "
+                  "grey bars come from the Vogue archive." if r.get("saved_years") else "")
     st.html(ui.section(f"Same houses, every {kind}", f"{name} across {kind} seasons",
-                       "Each bar averages the houses that showed that season (at least half of them)."))
+                       "Each bar averages the houses that showed that season (at least half of them)." + saved_note))
     st.altair_chart(season_chart(r), use_container_width=True)
 
     st.html(ui.section("House by house", "Against their own history",
@@ -303,9 +322,99 @@ def latest_page():
     st.html(ui.movers(list(s[s.lift > 1].head(4).itertuples()), list(s[s.lift < 1].tail(4).iloc[::-1].itertuples()), display))
 
 
-nav = st.navigation([
-    st.Page(trends_page, title="Trends", icon=":material/trending_up:", default=True),
-    st.Page(latest_page, title="Latest season", icon=":material/new_releases:", url_path="latest"),
-    st.Page(contact.page, title="Get in touch", icon=":material/mail:", url_path="contact"),
-])
+FEATURED_COMEBACK = ("garment", "a corset top")
+
+
+def findings_page():
+    st.html(ui.hero("1999–2027"))
+    st.html(ui.section("Findings", "What the runway is saying",
+                       "Headlines computed from the data - each one opens into the full view."))
+
+    # ---- 1. florals in the latest season ----
+    fl = cached_compare("pattern", "a floral print")
+    # ---- 2. the latest season's standout colour ----
+    col0 = cached_compare("colour", "black")
+    rising = col0["standouts"][col0["standouts"].lift > 1] if col0 else None
+    top_col = rising.label.iloc[0] if rising is not None and len(rising) else None
+    col = cached_compare("colour", top_col) if top_col else None
+
+    base = fl or col0
+    if not base:
+        st.info("Add a season of saved shows to unlock the findings (see the Latest season page).")
+        return
+    short = f"SS{str(base['year'])[-2:]}" if base["kind"] == "Spring" else f"{base['kind']} {base['year']}"
+
+    a, b = st.columns(2, gap="medium")
+    if fl:
+        ratio = fl["latest"] / fl["last_share"] if fl["last_share"] else None
+        h = fl["houses"]
+        leaders = h[(h.lift >= 1.2) & (h.base < 0.05)].head(3)
+        lead_txt = ", ".join(f"{d} ×{x:.1f}" for d, x in zip(leaders.designer, leaders.lift))
+        with a.container(key="finding-florals"):
+            verb = "back" if ratio and ratio >= 1.2 else "steady" if ratio and ratio > 0.8 else "fading"
+            st.html(ui.finding(f"{short} · patterns", f"Florals are {verb}: ×{ratio:.1f} on {fl['kind']} {fl['last_year']}",
+                               (f"Led by houses that rarely do florals: {lead_txt}." if lead_txt else
+                                f"{fl['n_up']} of {fl['n_hist']} houses are up on their own history.")
+                               + (f" Already up in {pv['season']}: ×{pv['lift']:.2f} since, same {len(pv['houses'])} houses."
+                                  if (pv := fl.get("prev")) and pv["lift"] < 1.5 else
+                                  f" ×{pv['lift']:.1f} on {pv['season']} alone." if pv else "")
+                               + f" {fl['n_shows']} shows, one vote each."))
+            st.altair_chart(season_chart(fl, height=200), use_container_width=True)
+            st.page_link(PAGES["latest"], label="Explore the latest season →")
+    if col:
+        name = display(top_col)
+        c_ratio = col["latest"] / col["last_share"] if col["last_share"] else None
+        with b.container(key="finding-colour"):
+            st.html(ui.finding(f"{short} · colour", f"{name.capitalize()} is the season's rising colour",
+                               f"{col['latest']:.1%} of looks, ×{c_ratio:.1f} on {col['kind']} {col['last_year']} for the same houses."
+                               + (f" It {'doubled' if 1.9 <= pv['lift'] < 2.5 else 'jumped ×' + format(pv['lift'], '.1f')} since "
+                                  f"{pv['season']} for the {len(pv['houses'])} houses saved in both."
+                                  if (pv := col.get("prev")) and pv["lift"] >= 1.5 else "")))
+            yrs = col0["recent_years"]
+            st.html(ui.colour_story(col0["base_all"], col0["now_all"], col0["per_house"].iloc[:0], PALETTE_SWATCH, display,
+                                    f"{col0['kind']} {yrs[0]}–{str(yrs[-1])[-2:]}", short))
+            st.page_link(PAGES["latest"], label="See the full colour story →")
+
+    c, d = st.columns(2, gap="medium")
+    # ---- 3. a comeback from the archive ----
+    g, label = FEATURED_COMEBACK
+    share = trends.vogue_yearly_share(cached_vogue(g, ("Ready-to-Wear", "Couture")), 100)
+    back = trends.comebacks(share, 3)
+    if len(back):
+        pick_row = back[back.label == label] if label in set(back.label) else back
+        row = next(pick_row.head(1).itertuples())
+        with c.container(key="finding-comeback"):
+            st.html(ui.finding("Archive · comebacks", f"The {display(row.label)} comeback",
+                               f"Peaked {row.peak_year}, bottomed out {row.trough_year}, and is back ×{row.recovery:.1f} since."))
+            st.html(ui.comebacks([row], share.rolling(3, center=True, min_periods=1).mean(), display, 3))
+            st.page_link(PAGES["trends"], label="Find more comebacks →")
+    # ---- 4. two decades of silhouette ----
+    sil = trends.vogue_yearly_share(cached_vogue("silhouette", ("Ready-to-Wear", "Couture")), 100)
+    mv = trends.movers(sil, 3)
+    if len(mv):
+        up, down = mv.label.iloc[0], mv.label.iloc[-1]
+        with d.container(key="finding-silhouette"):
+            st.html(ui.finding(f"Archive · {sil.index.min()}–{sil.index.max()}",
+                               f"{display(up).capitalize()} in, {display(down)} out",
+                               f"Across ~20,000 shows: {display(up)} ×{mv.lift.iloc[0]:.1f} lately, "
+                               f"{display(down)} ×{mv.lift.iloc[-1]:.2f}."))
+            st.altair_chart(trend_chart(sil, [up, down], "silhouette", height=200), use_container_width=True)
+            st.page_link(PAGES["trends"], label="Explore 25 years of trends →")
+
+
+PAGES = {
+    "findings": st.Page(findings_page, title="Findings", icon=":material/auto_awesome:", default=True),
+    "trends": st.Page(trends_page, title="Trends", icon=":material/trending_up:", url_path="trends"),
+    "latest": st.Page(latest_page, title="Latest season", icon=":material/new_releases:", url_path="latest"),
+    "accuracy": st.Page(accuracy.page, title="Accuracy", icon=":material/fact_check:", url_path="accuracy"),
+    "about": st.Page(about.about_page, title="About the data", icon=":material/menu_book:", url_path="about"),
+    "terms": st.Page(about.legal_page, title="Terms & privacy", icon=":material/gavel:", url_path="terms"),
+    "contact": st.Page(contact.page, title="Get in touch", icon=":material/mail:", url_path="contact"),
+}
+nav = st.navigation({
+    "": [PAGES["findings"]],
+    "Explore": [PAGES["trends"], PAGES["latest"], PAGES["accuracy"]],
+    "Moda": [PAGES["about"], PAGES["terms"], PAGES["contact"]],
+})
 nav.run()
+st.html(ui.footer(contact.EMAIL, contact.GITHUB + "/Moda"))

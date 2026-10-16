@@ -115,6 +115,75 @@ html, body {{ font-family: {BODY_FONT}; }}  /* widgets get Inter via theme.font;
   .moda-legend {{ margin-left: 0; }}
 }}
 
+/* ---------- findings ---------- */
+.moda-finding h3 {{ font-family: {DISPLAY_FONT}; font-weight: 500; font-size: 1.75rem; line-height: 1.15; color: var(--text); margin: .35rem 0 .3rem; padding: 0; }}
+.moda-finding p {{ color: var(--accent); font-size: .9rem; margin: 0; }}
+[class*="st-key-finding-"] {{ background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 1.2rem 1.3rem 1rem;
+  box-shadow: var(--shadow); transition: transform .45s var(--ease), box-shadow .45s var(--ease); }}
+[class*="st-key-finding-"]:hover {{ transform: translateY(-4px); box-shadow: var(--shadow-lift); }}
+
+/* ---------- long text (about / terms) ---------- */
+.st-key-moda-prose {{ background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 1.4rem 1.8rem; box-shadow: var(--shadow); max-width: 860px; }}
+.st-key-moda-prose h2, .st-key-moda-prose h3 {{ font-family: {DISPLAY_FONT}; font-weight: 500; color: var(--primary); }}
+.st-key-moda-prose p, .st-key-moda-prose li, .st-key-moda-prose td {{ font-size: .93rem; line-height: 1.6; }}
+.st-key-moda-prose table {{ font-size: .85rem; }}
+
+/* ---------- accuracy ---------- */
+.moda-question {{ font-family: {DISPLAY_FONT}; font-size: 1.9rem; line-height: 1.2; color: var(--text); margin-bottom: .6rem; }}
+.moda-question b {{ color: var(--primary); font-weight: 600; }}
+.moda-question span {{ display: block; font-family: {BODY_FONT}; font-size: .8rem; color: var(--accent); margin-top: .5rem; }}
+.moda-acc {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 1rem; }}
+.acc-group {{ background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: .9rem 1.1rem; box-shadow: var(--shadow); }}
+.acc-group h3 {{ font-family: {DISPLAY_FONT}; font-weight: 500; font-size: 1.35rem; margin: 0 0 .5rem; padding: 0; color: var(--text); }}
+.acc-row {{ display: grid; grid-template-columns: 7.5rem 1fr 2.6rem 2.6rem 7.6rem; align-items: center; gap: .5rem; font-size: .78rem; margin: .3rem 0; }}
+.acc-row .lbl {{ color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+.acc-row .track {{ height: 6px; background: #EEEBE3; border-radius: 99px; overflow: hidden; }}
+.acc-row .fill {{ height: 100%; border-radius: 99px; transform-origin: left; animation: moda-grow 1s var(--ease) both; animation-delay: calc(var(--i) * 50ms); }}
+.acc-row .fill.up {{ background: var(--rising); }} .acc-row .fill.mid {{ background: #C08A3E; }}
+.acc-row .fill.down {{ background: var(--primary); }} .acc-row .fill.na {{ background: var(--secondary); opacity: .5; }}
+.acc-row .v {{ text-align: right; font-variant-numeric: tabular-nums; }} .acc-row .n {{ color: var(--secondary); font-variant-numeric: tabular-nums; }}
+.acc-row .moda-chip {{ justify-self: start; font-size: .68rem; }}
+.moda-chip.mid {{ color: #8A5A16; background: rgba(192,138,62,.14); }}
+.moda-chip.na {{ color: var(--secondary); background: rgba(142,124,124,.12); }}
+
+/* ---------- envelope footer ---------- */
+.moda-footer {{ margin: 4.5rem 0 1rem; perspective: 1400px; }}
+.foot-env {{ position: relative; border-radius: 14px; background: #F3EBE0; box-shadow: var(--shadow-lift); overflow: hidden;
+  transition: transform .6s var(--ease); }}
+.foot-env:hover {{ transform: rotateX(4deg) translateY(-3px); }}
+.foot-flap {{ position: absolute; inset: 0 0 auto 0; height: 78px; background: #E4D8C8; clip-path: polygon(0 0, 100% 0, 50% 100%);
+  filter: drop-shadow(0 2px 2px rgba(77,0,0,.10)); transform-origin: top; transition: transform .7s var(--ease); }}
+.foot-env:hover .foot-flap {{ transform: rotateX(28deg); }}
+.foot-seal {{ position: absolute; left: 50%; top: 78px; width: 52px; height: 52px; margin: -32px 0 0 -26px; border-radius: 50%; z-index: 2;
+  background: radial-gradient(circle at 35% 30%, #A83232, var(--primary) 55%, #5E0E0E); color: #F6E9E0 !important; display: grid; place-items: center;
+  font-family: {DISPLAY_FONT}; font-style: italic; font-size: 1.55rem; text-decoration: none !important;
+  box-shadow: 0 4px 10px rgba(77,0,0,.35), inset 0 -3px 6px rgba(0,0,0,.25); transition: transform .4s var(--ease); }}
+.foot-seal:hover {{ transform: scale(1.1) rotate(-8deg); }}
+.foot-paper {{ display: grid; grid-template-columns: 1fr auto; gap: 1.5rem; padding: 6.2rem 2rem 1.6rem;
+  background: linear-gradient(to top right, #EFE6DA 49.8%, transparent 50%) left bottom / 50.5% 46% no-repeat,
+              linear-gradient(to top left, #EFE6DA 49.8%, transparent 50%) right bottom / 50.5% 46% no-repeat; }}
+.foot-addr {{ position: relative; z-index: 1; }}
+.foot-addr .to {{ font-family: {DISPLAY_FONT}; font-size: 1.15rem; color: var(--accent); margin-bottom: .6rem; }}
+.foot-addr .to em {{ color: var(--primary); }}
+.foot-addr nav {{ display: flex; flex-wrap: wrap; gap: .3rem 1.4rem; font-family: {DISPLAY_FONT}; font-size: 1.3rem; }}
+.foot-addr nav a {{ color: var(--text) !important; text-decoration: none !important; border-bottom: 1px solid transparent; transition: border-color .25s, color .25s; }}
+.foot-addr nav a:hover {{ color: var(--primary) !important; border-bottom-color: var(--primary); }}
+.foot-addr .fine {{ margin-top: .9rem; font-size: .74rem; color: var(--secondary); max-width: 46rem; line-height: 1.5; }}
+.foot-addr .fine a {{ color: var(--accent) !important; }}
+.foot-addr .sig {{ margin-top: .5rem; font-family: {DISPLAY_FONT}; font-style: italic; color: var(--accent); }}
+.foot-stamp {{ align-self: start; width: 86px; height: 104px; display: grid; place-content: center; text-align: center; transform: rotate(4deg);
+  background: var(--primary); color: #F6E9E0; font-family: {DISPLAY_FONT}; position: relative; z-index: 1;
+  border: 5px dotted #F3EBE0;  /* paper-coloured dots read as perforations */
+  box-shadow: 0 0 0 2px var(--primary), inset 0 0 0 4px var(--primary), inset 0 0 0 5px rgba(246,233,224,.55), 2px 4px 8px rgba(77,0,0,.18); }}
+.foot-stamp span {{ font-size: 1.5rem; font-style: italic; }}
+.foot-stamp small {{ font-family: {BODY_FONT}; font-size: .6rem; letter-spacing: .2em; opacity: .85; }}
+@media (max-width: 640px) {{
+  .foot-paper {{ grid-template-columns: 1fr; padding: 7rem 1.2rem 1.3rem; }}
+  .foot-stamp {{ position: absolute; right: 1rem; top: 6.6rem; width: 62px; height: 76px; }}
+  .foot-stamp span {{ font-size: 1.1rem; }}
+  .foot-addr .to {{ padding-right: 4.5rem; }}
+}}
+
 /* ---------- comebacks ---------- */
 @keyframes moda-bar {{ from {{ transform: scaleY(0); }} to {{ transform: scaleY(1); }} }}
 .moda-comebacks {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; perspective: 1000px; }}
@@ -156,8 +225,8 @@ html, body {{ font-family: {BODY_FONT}; }}  /* widgets get Inter via theme.font;
 .moda-foot {{ color: var(--secondary); font-size: .8rem; margin-top: .4rem; }}
 
 @media (prefers-reduced-motion: reduce) {{
-  .moda-in, .moda-rule, .moda-bar .fill, .moda-comeback .spark span, .moda-palette span, [data-testid="stVegaLiteChart"] {{ animation: none !important; opacity: 1 !important; transform: none !important; }}
-  .moda-tilt, .moda-look img, .moda-look .cap {{ transition: none !important; }}
+  .moda-in, .moda-rule, .moda-bar .fill, .moda-comeback .spark span, .moda-palette span, .acc-row .fill, [data-testid="stVegaLiteChart"] {{ animation: none !important; opacity: 1 !important; transform: none !important; }}
+  .moda-tilt, .moda-look img, .moda-look .cap, .foot-env, .foot-flap, [class*="st-key-finding-"] {{ transition: none !important; }}
 }}
 </style>
 """
@@ -333,8 +402,56 @@ def colour_story(before, now, per_house, swatch: dict, display, before_label: st
       <div class="row big"><span class="who">{esc(before_label)}</span><div class="moda-palette">{_segments(before, swatch, display)}</div></div>
       <div class="row big"><span class="who"><b>{esc(now_label)}</b></span><div class="moda-palette">{_segments(now, swatch, display, 4)}</div></div>
       <div class="moda-legend">{legend}</div>
-      <div class="houses">{rows}</div>
+      {f'<div class="houses">{rows}</div>' if rows else ''}
     </div>"""
+
+
+def accuracy_table(r, display) -> str:
+    """Per-label precision, grouped by attribute, as bar rows with a verdict chip."""
+    chip = {"reliable": "up", "shaky": "mid", "unreliable": "down", "not enough checks": "na"}
+    blocks = []
+    for group, g in r.groupby("attr_group", sort=False):
+        rows = "".join(
+            f'<div class="acc-row"><span class="lbl">{esc(display(x.label))}</span>'
+            f'<div class="track"><div class="fill {chip[x.verdict]}" style="width:{(x.precision or 0) * 100:.0f}%;--i:{i}"></div></div>'
+            f'<span class="v">{"–" if x.n == 0 else f"{x.precision:.0%}"}</span>'
+            f'<span class="n">{int(x.yes)}/{int(x.n)}</span>'
+            f'<span class="moda-chip {chip[x.verdict]}">{esc(x.verdict)}</span></div>'
+            for i, x in enumerate(g.itertuples())
+        )
+        blocks.append(f'<div class="acc-group moda-in"><h3>{esc(group.capitalize())}</h3>{rows}</div>')
+    return f'<div class="moda-acc">{"".join(blocks)}</div>'
+
+
+def finding(eyebrow: str, headline: str, sub: str) -> str:
+    return (f'<div class="moda-finding"><div class="moda-eyebrow">{esc(eyebrow)}</div>'
+            f'<h3>{esc(headline)}</h3><p>{esc(sub)}</p></div>')
+
+
+def footer(email: str, github: str) -> str:
+    """The site footer as the back of an envelope - same paper, flap and wax seal as the contact page."""
+    links = [("About the data", "/about"), ("Accuracy", "/accuracy"), ("Terms & privacy", "/terms"),
+             ("GitHub", github), ("Get in touch", "/contact")]
+    target = lambda h: 'target="_self"' if h.startswith("/") else 'target="_blank" rel="noopener"'
+    nav = "".join(f'<a href="{esc(h)}" {target(h)}>{esc(t)}</a>' for t, h in links)
+    return f"""
+    <footer class="moda-footer">
+      <div class="foot-env">
+        <div class="foot-flap"></div>
+        <a class="foot-seal" href="/contact" target="_self" title="Write to me">M</a>
+        <div class="foot-paper">
+          <div class="foot-addr">
+            <div class="to">To: <em>everyone who reads a runway closely</em></div>
+            <nav>{nav}</nav>
+            <div class="fine">Photos belong to their owners: Vogue / Condé Nast and photographers, Tagwalk,
+              and Wikimedia Commons contributors. Trend figures are model estimates. Not affiliated with any brand.
+              Removal requests: <a href="mailto:{esc(email)}">{esc(email)}</a></div>
+            <div class="sig">© 2026 Rania Faisal · Moda</div>
+          </div>
+          <div class="foot-stamp"><span>Moda</span><small>SS27</small></div>
+        </div>
+      </div>
+    </footer>"""
 
 
 @lru_cache(maxsize=512)

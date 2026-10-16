@@ -15,6 +15,7 @@ Lay your saved looks out as  <archive>/<Designer>/<Season>/<any>.jpg, e.g.
     python -m runway.personal import ~/Pictures/moda-archive
     python -m runway.personal import-show ~/Downloads/miumiu-ss27 --designer "Miu Miu" --season "Spring 2027 Ready-to-Wear" --credit Tagwalk
     python -m runway.tag                       # tags the new looks
+    python -m runway.personal import-downloads   # every '<house> ss27' / 'dior fw26' folder in ~/Downloads
     python -m runway.personal clear            # remove every personal look again
 
 Copies are resized into data/personal/ (git-ignored). They're marked private, so
@@ -94,7 +95,9 @@ def import_folder(conn, folder: Path, designer: str, season: str, page_url: str,
             continue
         rel = f"{designer}/{season}/{img_path.name}"
         pid = look_id(rel)
-        if conn.execute("SELECT 1 FROM looks WHERE pageid = ?", (pid,)).fetchone():
+        # Same file in the same season counts as already imported, even if it was filed under another house before.
+        if conn.execute("SELECT 1 FROM looks WHERE pageid = ? OR (source = 'personal' AND title LIKE ?)",
+                        (pid, f"%/{season}/{img_path.name}")).fetchone():
             skipped += 1
             continue
         dest = PERSONAL_DIR / f"{-pid}.jpg"
@@ -116,6 +119,96 @@ def import_folder(conn, folder: Path, designer: str, season: str, page_url: str,
         added += 1
     conn.commit()
     return added, skipped
+
+
+# Folder names you might use -> the house's name (matching Vogue Runway where possible).
+DESIGNERS = {
+    "lv": "Louis Vuitton", "louis vuitton": "Louis Vuitton", "louisvuitton": "Louis Vuitton",
+    "armani": "Giorgio Armani", "giorgio armani": "Giorgio Armani", "giorgioarmani": "Giorgio Armani",
+    "dior": "Dior", "christian dior": "Dior", "christiandior": "Dior",
+    "ysl": "Saint Laurent", "saint laurent": "Saint Laurent", "saintlaurent": "Saint Laurent",
+    "miumiu": "Miu Miu", "miu miu": "Miu Miu", "hermes": "Hermès", "hermès": "Hermès",
+    "alaia": "Alaïa", "alaïa": "Alaïa", "ellie saab": "Elie Saab", "elie saab": "Elie Saab", "eliesaab": "Elie Saab",
+    "zimmerman": "Zimmermann", "zimmermann": "Zimmermann", "v-westwood": "Vivienne Westwood",
+    "vivienne westwood": "Vivienne Westwood", "viviennewestwood": "Vivienne Westwood",
+    "jpg": "Jean Paul Gaultier", "jean paul gaultier": "Jean Paul Gaultier", "jeanpaulgaultier": "Jean Paul Gaultier",
+    "isabel marant": "Isabel Marant", "isabelmarant": "Isabel Marant", "stella mccartney": "Stella McCartney",
+    "stellamccartney": "Stella McCartney", "mcqueen": "Alexander McQueen", "alexander mcqueen": "Alexander McQueen",
+    "dolce": "Dolce & Gabbana", "d&g": "Dolce & Gabbana", "dolce gabbana": "Dolce & Gabbana",
+    "bottega": "Bottega Veneta", "bottega veneta": "Bottega Veneta", "bottegaveneta": "Bottega Veneta",
+}
+FOLDER_RE = re.compile(r"^(?P<name>.+?)[\s_-]+(?P<couture>couture[\s_-]+)?(?P<kind>ss|fw|aw|resort|prefall|pre-fall|spring|fall)[\s_-]?(?P<yy>\d{4}|\d{2})(?P<rest>.*)$", re.I)
+KIND_WORD = {"ss": "Spring", "spring": "Spring", "fw": "Fall", "aw": "Fall", "fall": "Fall",
+             "resort": "Resort", "prefall": "Pre-Fall", "pre-fall": "Pre-Fall"}
+
+
+def designer_name(text: str) -> str:
+    key = text.strip().lower()
+    return DESIGNERS.get(key) or DESIGNERS.get(re.sub(r"[^a-z]", "", key)) or text.strip().title()
+
+
+def parse_folder(name: str) -> tuple[str, str] | None:
+    """'chanel ss27' -> ('Chanel', 'Spring 2027 Ready-to-Wear'); 'dior couture fw26' -> ('Dior', 'Fall 2026 Couture')."""
+    m = FOLDER_RE.match(name.strip())
+    if not m:
+        return None
+    yy = m.group("yy")
+    year = int(yy) if len(yy) == 4 else 2000 + int(yy)
+    category = "Couture" if m.group("couture") or "couture" in m.group("rest").lower() else "Ready-to-Wear"
+    return designer_name(m.group("name")), f"{KIND_WORD[m.group('kind').lower()]} {year} {category}"
+
+
+def _slug(text: str) -> str:
+    return re.sub(r"[^a-z]", "", unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower())
+
+
+def _house_slugs() -> list[tuple[str, str]]:
+    """('valentino', 'Valentino'), ('christiandior', 'Dior'), ... longest first, so 'redvalentino' beats 'valentino'."""
+    from .sources import HOUSES
+
+    pairs = {_slug(k): v for k, v in DESIGNERS.items()}
+    pairs.update({_slug(h): DESIGNERS.get(h.lower(), h) for h in HOUSES})
+    pairs.update({_slug(d): d for (d,) in connect().execute("SELECT DISTINCT designer FROM looks WHERE source = 'personal'")})
+    return sorted(((k, v) for k, v in pairs.items() if len(k) >= 4), key=lambda kv: -len(kv[0]))
+
+
+def file_designer(filename: str, slugs: list[tuple[str, str]] | None = None) -> str | None:
+    """Tagwalk names files like 'valentinoss27064-....webp': the house is whichever known name the file starts with."""
+    name = filename.lower()
+    return next((house for slug, house in (slugs or _house_slugs()) if name.startswith(slug)), None)
+
+
+def import_downloads(root: Path, credit: str = "Tagwalk", dry_run: bool = False) -> None:
+    """Import every '<house> <season>' folder in `root` (e.g. ~/Downloads/chanel ss27), routing stray looks to the
+    house their file name says they belong to. Safe to re-run: looks already imported are skipped."""
+    import tempfile
+
+    conn = connect()
+    slugs = _house_slugs()
+    total = 0
+    for folder in sorted(p for p in root.iterdir() if p.is_dir()):
+        parsed = parse_folder(folder.name)
+        if not parsed:
+            continue
+        house, season = parsed
+        by_house: dict[str, list[Path]] = {}
+        for f in folder.iterdir():
+            if f.suffix.lower() in EXTS:
+                by_house.setdefault(file_designer(f.name, slugs) or house, []).append(f)
+        for who, files in sorted(by_house.items()):
+            moved = "" if who == house else f"  (found in '{folder.name}', filed under {who})"
+            if dry_run:
+                print(f"  {who:20s} {season:28s} {len(files):3d} looks{moved}")
+                continue
+            with tempfile.TemporaryDirectory() as tmp:  # links only - your folders are never changed
+                for f in files:
+                    (Path(tmp) / f.name).symlink_to(f)
+                added, skipped = import_folder(conn, Path(tmp), who, season, vogue_url(who, season), credit)
+            total += added
+            if added or moved:
+                print(f"  {who:20s} {season:28s} +{added} new, {skipped} already in{moved}")
+    if not dry_run:
+        print(f"Imported {total} new looks. Run `python -m runway.tag` next.")
 
 
 def clear() -> None:
@@ -140,10 +233,16 @@ def main():
     one.add_argument("--season", required=True, help='e.g. "Spring 2027 Ready-to-Wear"')
     one.add_argument("--url", help="collection page for link-outs (default: its Vogue Runway page)")
     one.add_argument("--credit", default="", help='where the photos came from, shown on each look, e.g. "Tagwalk"')
+    dl = sub.add_parser("import-downloads", help="import every '<house> <season>' folder, e.g. ~/Downloads/chanel ss27")
+    dl.add_argument("root", type=Path, nargs="?", default=Path.home() / "Downloads")
+    dl.add_argument("--credit", default="Tagwalk")
+    dl.add_argument("--dry-run", action="store_true", help="show what would be imported, change nothing")
     sub.add_parser("clear", help="remove all personal looks")
     args = ap.parse_args()
     if args.cmd == "import":
         import_archive(args.archive.expanduser())
+    elif args.cmd == "import-downloads":
+        import_downloads(args.root.expanduser(), args.credit, args.dry_run)
     elif args.cmd == "import-show":
         import_show(args.folder.expanduser(), args.designer, args.season, args.url, args.credit)
     else:

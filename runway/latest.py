@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS clip_tags (
 SEASON_RE = re.compile(r"(pre-fall|resort|cruise|spring|summer|fall|autumn)\D*((?:19|20)\d{2})", re.I)
 KIND = {"cruise": "Resort", "summer": "Spring", "autumn": "Fall", "pre-fall": "Pre-Fall"}
 # Vogue sometimes files a house under another name.
-ALIASES = {"alaia": {"azzedinealaia"}, "saintlaurent": {"yvessaintlaurent"}, "celine": {"celine"}}
+ALIASES = {"alaia": {"azzedinealaia"}, "saintlaurent": {"yvessaintlaurent"}, "celine": {"celine"},
+           "dior": {"christiandior"}}
 
 
 def norm(name: str) -> str:
@@ -103,6 +104,40 @@ def latest_shows(group: str) -> pd.DataFrame:
     return df[df.season == season]
 
 
+def personal_history(group: str, kind: str, category: str, before_year: int) -> pd.DataFrame:
+    """Earlier seasons you've saved (e.g. Spring 2025 and 2026), shaped like the Vogue rows,
+    so they fill the gap between the end of the Vogue archive and the latest season."""
+    conn = connect()
+    conn.executescript(SCHEMA)
+    df = pd.read_sql_query(
+        """SELECT l.designer, l.season AS season_name, c.label, AVG(c.score) AS share
+           FROM clip_tags c JOIN looks l USING (pageid)
+           WHERE l.source = 'personal' AND c.attr_group = ?
+           GROUP BY l.designer, l.season, c.label""",
+        conn, params=(group,),
+    )
+    if df.empty:
+        return df
+    parsed = df.season_name.map(parse_season)
+    df = df.assign(season=[p[0] for p in parsed], year=[p[1] for p in parsed], category=[p[2] for p in parsed])
+    df = df[(df.season == kind) & (df.category == category) & (df.year < before_year)]
+    return df.assign(key=df.designer.map(norm), origin="saved")[["designer", "key", "season", "year", "label", "share", "origin"]]
+
+
+def _previous(saved: pd.DataFrame, now: pd.Series, label: str, year: int, kind: str, min_houses: int = 3) -> dict | None:
+    """Same houses, last year's saved season vs this one - answers 'is this new, or did it start earlier?'"""
+    if saved is None or saved.empty:
+        return None
+    prev = saved[(saved.year == year - 1) & (saved.label == label)].set_index("designer").share
+    both = sorted(set(prev.index) & set(now.index))
+    if len(both) < min_houses:
+        return None
+    a, b = prev[both], now[both]
+    return {"season": f"{kind} {year - 1}", "houses": both, "prev": float(a.mean()), "now": float(b.mean()),
+            "lift": float(b.mean() / a.mean()) if a.mean() > 0 else float("nan"),
+            "up": int((b > a * 1.2).sum()), "down": int((b < a * 0.8).sum())}
+
+
 def compare(group: str, label: str, recent: int = 5, min_share: float = 0.02) -> dict | None:
     """Latest saved season vs. the same houses' history for one label."""
     from .trends import load_vogue
@@ -114,7 +149,12 @@ def compare(group: str, label: str, recent: int = 5, min_share: float = 0.02) ->
     kind, year, category = parse_season(season)
     vogue = load_vogue(group, [category])
     vogue = vogue.assign(key=vogue.designer.map(norm))
-    hist_all = vogue[(vogue.season == kind) & (vogue.year < year)]
+    hist_all = vogue[(vogue.season == kind) & (vogue.year < year)].assign(origin="vogue")
+    saved = personal_history(group, kind, category, year)
+    if len(saved):
+        # A season you saved replaces the archive's copy of the same house-season, if both exist.
+        dup = hist_all.set_index(["key", "year"]).index.isin(saved.set_index(["key", "year"]).index)
+        hist_all = pd.concat([hist_all[~dup], saved], ignore_index=True)
 
     def history_of(designer: str) -> pd.DataFrame:
         keys = {norm(designer)} | ALIASES.get(norm(designer), set())
@@ -136,10 +176,13 @@ def compare(group: str, label: str, recent: int = 5, min_share: float = 0.02) ->
     same = hist_all[hist_all.key.isin(keys)]
     per_year = same.groupby(["year", "label"]).agg(share=("share", "mean"), houses=("key", "nunique")).reset_index()
     per_year = per_year[per_year.houses >= max(2, len(now) // 2)]
-    series = per_year[per_year.label == label][["year", "share", "houses"]]
+    origin = same.groupby("year").origin.agg(lambda o: "saved" if (o == "saved").any() else "vogue").rename("origin")
+    series = per_year[per_year.label == label][["year", "share", "houses"]].merge(origin, left_on="year", right_index=True)
 
     latest = now.mean()
-    last = series.iloc[-1] if len(series) else None
+    # The headline baseline is the archive's last season; saved seasons get their own year-on-year comparison.
+    archive = series[series.origin == "vogue"]
+    last = archive.iloc[-1] if len(archive) else (series.iloc[-1] if len(series) else None)
     higher = series[series.share >= latest]
     with_hist = houses[houses.seasons > 0]
 
@@ -151,7 +194,10 @@ def compare(group: str, label: str, recent: int = 5, min_share: float = 0.02) ->
     standouts = standouts.assign(now=now_all, base=base_all).reset_index()
     standouts = standouts[(standouts.now >= min_share) | (standouts.base >= min_share)]  # ignore near-zero labels
 
-    missing = [y for y in range(int(last.year) + 1, year) if last is not None] if last is not None else []
+    # Seasons with no usable data between the end of the archive and the latest season.
+    vogue_years = series[series.origin == "vogue"].year
+    present = set(series.year)
+    missing = [y for y in range(int(vogue_years.max()) + 1, year) if y not in present] if len(vogue_years) else []
     return {
         "season": season, "kind": kind, "year": year, "category": category,
         "n_shows": len(now), "n_looks": int(shows[shows.label == label].n_looks.sum()),
@@ -162,6 +208,11 @@ def compare(group: str, label: str, recent: int = 5, min_share: float = 0.02) ->
         "n_up": int((with_hist.lift >= 1.2).sum()), "n_down": int((with_hist.lift <= 0.8).sum()),
         "n_hist": len(with_hist), "no_history": list(houses[houses.seasons == 0].designer),
         "missing_years": missing, "standouts": standouts,
+        "saved_years": sorted(saved.year.unique().tolist()) if len(saved) else [],
+        "prev": _previous(saved, now, label, year, kind),
+        # saved seasons that exist but cover too few of these houses to chart: {year: houses saved}
+        "partial": {int(y): int(n) for y, n in same[same.origin == "saved"].groupby("year").key.nunique().items()
+                    if y not in set(series.year)},
         # every label, unfiltered - for palettes and other whole-group views
         "now_all": now_all, "base_all": base_all, "recent_years": recent_years,
         "per_house": shows.pivot_table(index="designer", columns="label", values="share"),
