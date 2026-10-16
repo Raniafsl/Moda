@@ -180,7 +180,7 @@ def trends_page():
 - **Vogue Runway archive:** a scraped dataset from the Internet Archive (no license given), scored from
   its metadata and precomputed CLIP image embeddings. Gallery photos load directly from Vogue's servers (never
   stored here), are credited, and link to their collection. Scores are averaged per show, so every show is one vote.
-- **Personal archive:** looks you saved yourself (`python -m runway.personal`) count toward the charts
+- **Hand-collected looks:** recent shows collected by hand count toward the charts
   but are never displayed; the gallery links out to the original collection instead.
 - **Tagging:** [FashionCLIP](https://huggingface.co/patrickjohncyh/fashion-clip) scores each photo against text
   prompts (zero-shot, no training). Labels within an attribute compete, so shares in a year sum to 100%.
@@ -226,7 +226,7 @@ def season_chart(r: dict, height: int = 320) -> alt.Chart:
 
 def latest_page():
     if not trends.vogue_available():
-        st.info("The Latest season page compares your saved shows with the Vogue Runway archive - build it first "
+        st.info("The Latest season page compares hand-collected shows with the Vogue Runway archive - build it first "
                 "(`python -m runway.vogue build`).")
         return
     a, b = st.columns([3, 2], vertical_alignment="bottom")
@@ -250,14 +250,14 @@ def latest_page():
     name = display(pick)
 
     st.html(ui.section(f"Latest season · {r['n_shows']} shows", f"{r['season']} vs. history",
-                       f"Your saved shows, scored with standard CLIP like the Vogue archive, against the same "
+                       f"A hand-collected sample of the season's shows, scored with standard CLIP like the Vogue archive, against the same "
                        f"houses' own past {kind} seasons."))
     ratio = r["latest"] / r["last_share"] if r["last_share"] else None
     st.html(ui.stat_cards([
         (ui.count(r["latest"] * 100, 1, "%"), f"{name} in {short}", f"mean of {r['n_shows']} shows, one vote each"),
         (("×" + ui.count(ratio, 2)) if ratio else "–", f"vs {kind} {r['last_year']}", "same houses, last season on record"),
         (f"{ui.count(r['n_up'])}<small>/{r['n_hist']}</small>", "Houses up ≥20%", f"{r['n_down']} down, against their own average"),
-    ] + ([(("×" + ui.count(p["lift"], 2)), f"vs {p['season']}", f"same {len(p['houses'])} houses, saved seasons")]
+    ] + ([(("×" + ui.count(p["lift"], 2)), f"vs {p['season']}", f"same {len(p['houses'])} houses, hand-collected")]
          if (p := r.get("prev")) else [])))
     bits = []
     if r["highest_since"]:
@@ -268,8 +268,7 @@ def latest_page():
     if m := [y for y in r["missing_years"] if y not in partial]:
         bits.append(f"No data for {kind} {m[0]}{'–' + str(m[-1]) if len(m) > 1 else ''}: the Vogue archive ends there.")
     for y, n in partial.items():
-        bits.append(f"{kind} {y} is partly saved ({n} of {r['n_shows']} houses), too few to chart; "
-                    f"save {max(r['n_shows'] // 2 - n, 1)} more of these houses to add it.")
+        bits.append(f"{kind} {y} covers only {n} of these {r['n_shows']} houses so far, too few to chart.")
     if p := r.get("prev"):
         above_archive = r["latest"] > (r["last_share"] or 0) * 1.2
         change = ("a new move this season" if p["lift"] >= 1.5
@@ -278,14 +277,14 @@ def latest_page():
                   else "little change since last season")
         bits.append(f"Same {len(p['houses'])} houses year on year: {p['prev']:.1%} in {p['season']} → {p['now']:.1%} now "
                     f"(×{p['lift']:.2f}, {p['up']} up, {p['down']} down) - {change}.")
-    bits.append(f"You chose these {r['n_shows']} shows; add more to make the comparison sturdier.")
+    bits.append(f"Based on a hand-collected sample of {r['n_shows']} shows; more will be added as the season is collected.")
     st.html(ui.note(" ".join(bits)))
 
     if (acc := accuracy.reliability(group, pick)) and acc["precision"] < 0.75:
         st.html(ui.note(f"Accuracy check: when Moda labels a look ‘{name}’, it was right {acc['precision']:.0%} of the "
                         f"time ({int(acc['yes'])} of {int(acc['n'])} checked). Treat this label's numbers with caution."))
 
-    saved_note = (f" Rose bars ({', '.join(f'{kind} {y}' for y in r['saved_years'])}) are seasons you saved; "
+    saved_note = (f" Rose bars ({', '.join(f'{kind} {y}' for y in r['saved_years'])}) are hand-collected seasons; "
                   "grey bars come from the Vogue archive." if r.get("saved_years") else "")
     st.html(ui.section(f"Same houses, every {kind}", f"{name} across {kind} seasons",
                        "Each bar averages the houses that showed that season (at least half of them)." + saved_note))
@@ -308,7 +307,7 @@ def latest_page():
         cs = c["standouts"].rename(columns={"now": "recent", "base": "baseline"})
         st.html(ui.movers(list(cs[cs.lift > 1].head(4).itertuples()), list(cs[cs.lift < 1].tail(4).iloc[::-1].itertuples()), display))
 
-    st.html(ui.section("The looks", f"{short} on the runway", f"Your saved looks, ranked by how {name} the model finds them."))
+    st.html(ui.section("The looks", f"{short} on the runway", f"The season's looks, ranked by how {name} the model finds them."))
     houses = sorted(r["houses"].designer)
     view = st.selectbox("Show", [f"Most {name}"] + houses, label_visibility="collapsed")
     looks = latest.latest_looks(group, pick, None if view.startswith("Most ") else view)
@@ -327,6 +326,13 @@ FEATURED_COMEBACK = ("garment", "a corset top")
 
 def findings_page():
     st.html(ui.hero("1999–2027"))
+    archive = trends.vogue_summary(cached_vogue("colour", ("Ready-to-Wear", "Couture")))
+    sample = cached_compare("colour", "black")
+    st.html(ui.stat_cards([
+        (ui.count(archive["shows"]), "Designer shows", f"{archive['designers']:,} houses in the Vogue Runway archive"),
+        (ui.count(archive["looks"]), "Runway looks", "each one scored by a vision model"),
+    ] + ([(ui.count(sample["n_shows"]), f"{sample['kind']} {sample['year']} shows", "hand-collected for the latest season")]
+         if sample else [])))
     st.html(ui.section("Findings", "What the runway is saying",
                        "Headlines computed from the data - each one opens into the full view."))
 
@@ -340,7 +346,7 @@ def findings_page():
 
     base = fl or col0
     if not base:
-        st.info("Add a season of saved shows to unlock the findings (see the Latest season page).")
+        st.info("Findings appear once a recent season has been collected.")
         return
     short = f"SS{str(base['year'])[-2:]}" if base["kind"] == "Spring" else f"{base['kind']} {base['year']}"
 
@@ -368,7 +374,7 @@ def findings_page():
             st.html(ui.finding(f"{short} · colour", f"{name.capitalize()} is the season's rising colour",
                                f"{col['latest']:.1%} of looks, ×{c_ratio:.1f} on {col['kind']} {col['last_year']} for the same houses."
                                + (f" It {'doubled' if 1.9 <= pv['lift'] < 2.5 else 'jumped ×' + format(pv['lift'], '.1f')} since "
-                                  f"{pv['season']} for the {len(pv['houses'])} houses saved in both."
+                                  f"{pv['season']} for the {len(pv['houses'])} houses in both seasons."
                                   if (pv := col.get("prev")) and pv["lift"] >= 1.5 else "")))
             yrs = col0["recent_years"]
             st.html(ui.colour_story(col0["base_all"], col0["now_all"], col0["per_house"].iloc[:0], PALETTE_SWATCH, display,
@@ -417,4 +423,13 @@ nav = st.navigation({
     "Moda": [PAGES["about"], PAGES["terms"], PAGES["contact"]],
 })
 nav.run()
-st.html(ui.footer(contact.EMAIL, contact.GITHUB + "/Moda"))
+def data_updated() -> str:
+    """Build date stamped by `python -m runway.bundle` (deployed copies only)."""
+    import re
+    from datetime import date
+    marker = ROOT / "data" / "DEPLOYED"
+    m = re.search(r"built (\d{4}-\d{2}-\d{2})", marker.read_text()) if marker.exists() else None
+    return f"{date.fromisoformat(m.group(1)):%B %-d, %Y}" if m else ""
+
+
+st.html(ui.footer(contact.EMAIL, contact.GITHUB + "/Moda", data_updated()))

@@ -16,7 +16,7 @@ def _prose(md: str) -> None:
 
 def about_page() -> None:
     st.html(ui.section("About the data", "Where Moda's numbers come from",
-                       "Sources, method and limits, so you can judge the findings for yourself."))
+                       "Sources, method and limits, so every finding can be judged on its own terms."))
     _prose(f"""
 ### Sources
 
@@ -50,7 +50,7 @@ Wikimedia, or any fashion house.
 
 ### Removal requests
 
-If you own a photo shown here and want it removed, email **[{EMAIL}](mailto:{EMAIL})** with the page and look.
+Photo owners who want an image removed can email **[{EMAIL}](mailto:{EMAIL})** with the page and look.
 It will be taken down promptly, normally within 48 hours.
 
 Code: [{GITHUB.removeprefix('https://')}/Moda]({GITHUB}/Moda)
@@ -59,7 +59,7 @@ Code: [{GITHUB.removeprefix('https://')}/Moda]({GITHUB}/Moda)
 
 def legal_page() -> None:
     st.html(ui.section("Terms & privacy", "The short version",
-                       "Moda is a free, non-commercial student project. It doesn't collect your personal data."))
+                       "Moda is a free, non-commercial student project. It doesn't collect personal data."))
     _prose(f"""
 *Effective {EFFECTIVE}. Moda is run by {OWNER} ("I", "me"), a student at the University of Waterloo.
 Questions: [{EMAIL}](mailto:{EMAIL}).*
@@ -69,19 +69,19 @@ Questions: [{EMAIL}](mailto:{EMAIL}).*
 **What Moda collects: nothing.** There are no accounts, no sign-ups, no analytics, and no tracking cookies set by
 Moda. Streamlit's own usage statistics are switched off.
 
-**The contact form** doesn't send anything to Moda. "Seal & send" opens *your* email app with a pre-filled message;
-nothing is sent until you press send there, and it then reaches me like any other email. I use it only to reply.
+**The contact form** doesn't send anything to Moda. "Seal & send" opens the visitor's own email app with a pre-filled
+message; nothing is sent until it's sent from there, and it then arrives like any other email. Messages are used only to reply.
 
-**Services your browser talks to.** Like most websites, Moda loads some things from other companies, which see
-standard technical data (such as your IP address and browser type) under their own privacy policies:
+**Services a visitor's browser talks to.** Like most websites, Moda loads some things from other companies, which see
+standard technical data (such as IP address and browser type) under their own privacy policies:
 
 - **Streamlit Community Cloud** (Snowflake Inc.) hosts the app and keeps standard server and security logs, and
   may use cookies needed to run the app.
 - **Google Fonts** serves the typefaces.
 - **Vogue (Condé Nast)** and **Wikimedia** serve the runway photos shown in galleries.
 
-**Your rights.** Since Moda holds no personal data about visitors, there's nothing to access or delete. If you've
-emailed me and want that correspondence deleted, just ask.
+**Data rights.** Since Moda holds no personal data about visitors, there's nothing to access or delete. Anyone who has
+emailed and wants that correspondence deleted can ask, and it will be.
 
 ## Terms of use
 
@@ -91,7 +91,7 @@ emailed me and want that correspondence deleted, just ask.
    Don't rely on them for business, financial or buying decisions.
 3. **Photos and trademarks** belong to their owners: Vogue / Condé Nast, the photographers, Tagwalk, Wikimedia
    Commons contributors, and the fashion houses. They're shown for commentary and research, credited and linked to
-   their sources. You may not copy or reuse them from Moda.
+   their sources, and may not be copied or reused from Moda.
 4. **No affiliation.** Moda isn't affiliated with or endorsed by any company or brand named on the site.
 5. **Removal requests.** Rights holders can email [{EMAIL}](mailto:{EMAIL}) to have material removed; I'll act
    promptly.

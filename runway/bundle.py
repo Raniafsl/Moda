@@ -53,7 +53,8 @@ def copy_code() -> None:
     (DEPLOY / ".gitignore").write_text("__pycache__/\n.DS_Store\n")
     marker = DEPLOY / "data" / "DEPLOYED"  # tells the app it's public: hides the labelling tool
     marker.parent.mkdir(parents=True, exist_ok=True)
-    marker.write_text("This copy is deployed: read-only features only.\n")
+    from datetime import date
+    marker.write_text(f"This copy is deployed: read-only features only.\nbuilt {date.today().isoformat()}\n")
 
 
 def copy_vogue() -> None:

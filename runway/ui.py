@@ -224,6 +224,15 @@ html, body {{ font-family: {BODY_FONT}; }}  /* widgets get Inter via theme.font;
 
 .moda-foot {{ color: var(--secondary); font-size: .8rem; margin-top: .4rem; }}
 
+@media (max-width: 640px) {{
+  .moda-stats {{ grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }}
+  .moda-stat {{ padding: .8rem .9rem .75rem; border-radius: 14px; }}
+  .moda-stat .num {{ font-size: 2.1rem; }}
+  .moda-stat .lbl {{ font-size: .64rem; letter-spacing: .1em; }}
+  .moda-stat .sub {{ font-size: .72rem; }}
+  .moda-tagline {{ font-size: 1.2rem; }}
+}}
+
 @media (prefers-reduced-motion: reduce) {{
   .moda-in, .moda-rule, .moda-bar .fill, .moda-comeback .spark span, .moda-palette span, .acc-row .fill, [data-testid="stVegaLiteChart"] {{ animation: none !important; opacity: 1 !important; transform: none !important; }}
   .moda-tilt, .moda-look img, .moda-look .cap, .foot-env, .foot-flap, [class*="st-key-finding-"] {{ transition: none !important; }}
@@ -286,7 +295,7 @@ def hero(years: str) -> str:
     <div class="moda-hero">
       <div class="moda-eyebrow moda-in" style="--i:0">Runway intelligence · {esc(years)}</div>
       <div class="moda-wordmark moda-in" style="--i:1">Mo<em>d</em>a</div>
-      <div class="moda-tagline moda-in" style="--i:2">What's rising and fading on the runway, read from two decades of openly licensed show photography.</div>
+      <div class="moda-tagline moda-in" style="--i:2">What's rising and fading on the runway, read from 20,000 designer shows and the newest collections.</div>
       <div class="moda-rule"></div>
     </div>"""
 
@@ -428,7 +437,7 @@ def finding(eyebrow: str, headline: str, sub: str) -> str:
             f'<h3>{esc(headline)}</h3><p>{esc(sub)}</p></div>')
 
 
-def footer(email: str, github: str) -> str:
+def footer(email: str, github: str, updated: str = "") -> str:
     """The site footer as the back of an envelope - same paper, flap and wax seal as the contact page."""
     links = [("About the data", "/about"), ("Accuracy", "/accuracy"), ("Terms & privacy", "/terms"),
              ("GitHub", github), ("Get in touch", "/contact")]
@@ -446,7 +455,7 @@ def footer(email: str, github: str) -> str:
             <div class="fine">Photos belong to their owners: Vogue / Condé Nast and photographers, Tagwalk,
               and Wikimedia Commons contributors. Trend figures are model estimates. Not affiliated with any brand.
               Removal requests: <a href="mailto:{esc(email)}">{esc(email)}</a></div>
-            <div class="sig">© 2026 Rania Faisal · Moda</div>
+            <div class="sig">© 2026 Rania Faisal · Moda{f" · data updated {esc(updated)}" if updated else ""}</div>
           </div>
           <div class="foot-stamp"><span>Moda</span><small>SS27</small></div>
         </div>
@@ -460,7 +469,7 @@ def _data_uri(path: str) -> str:
 
 
 def coverage_note(personal: int) -> str:
-    extra = f" Includes {personal:,} looks from your personal archive (analysed, never displayed)." if personal else ""
+    extra = f" Includes {personal:,} hand-collected looks from recent seasons." if personal else ""
     return (f'<div class="moda-note moda-in" style="--i:6">A sample, not the whole runway: professional show photography '
             f'is licensed, so this draws on openly licensed photos, which cover major houses unevenly.{esc(extra)}</div>')
 
@@ -479,7 +488,7 @@ def _private_card(l, label: str, i: int) -> str:
     """Personal-archive looks are never shown - just who/when and a link to the original."""
     vogue = "vogue.com" in (l.page_url or "")
     link = (f'<a href="{esc(l.page_url)}" target="_blank" rel="noopener">{"View on Vogue Runway" if vogue else "View collection"} ↗</a>'
-            if l.page_url else "Personal archive")
+            if l.page_url else "Hand-collected")
     return (
         f'<figure class="moda-look moda-private moda-tilt moda-in" style="--i:{i};margin:0" data-max="9">'
         f'<div class="who"><span>{esc(l.designer or "")}</span><em>{esc(l.season or "")}</em></div>'

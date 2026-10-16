@@ -136,7 +136,7 @@ def reliability(group: str, label: str) -> dict | None:
 
 def _labeller() -> None:
     st.html(ui.section("Check the model", "Is Moda right?",
-                       "Moda shows one of your saved looks and the label it picked. Answer honestly - "
+                       "One hand-collected look and the label Moda picked for it. Honest answers matter most - "
                        "‘No’ answers are what make this useful. Keys: the buttons below."))
     group = st.segmented_control("Attribute", list(GROUPS), default="colour", format_func=str.capitalize,
                                  key="eval-group") or "colour"

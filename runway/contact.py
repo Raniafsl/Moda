@@ -13,7 +13,7 @@ from . import ui
 
 # Edit these.
 NAME = "Rania"
-EMAIL = "faisalrania854@gmail.com"
+EMAIL = "r22faisa@uwaterloo.ca"
 LINKEDIN = "https://www.linkedin.com/in/rania-faisal-500b5032b/"
 GITHUB = "https://github.com/Raniafsl"
 
@@ -168,7 +168,7 @@ def _link(icon: str, title: str, value: str, href: str, i: int) -> str:
 
 def page():
     st.html(ui.section("Correspondence", "Get in touch",
-                       "Collaborations, co-op roles, or a trend you think I'm missing. Break the seal and write me a note."))
+                       "Collaborations, co-op roles, or a trend Moda is missing: break the seal and write a note."))
     handle = lambda url: url.rstrip("/").split("/")[-1]
     letter_lines = "".join("<span></span>" for _ in range(5))
     st.html(CSS + JS + f"""
@@ -185,14 +185,14 @@ def page():
           <form data-to="{html.escape(EMAIL)}">
             <div class="salute">Dear {html.escape(NAME)},</div>
             <div class="row">
-              <div><label for="m-name">Your name</label><input id="m-name" name="name" required autocomplete="name"></div>
-              <div><label for="m-email">Your email</label><input id="m-email" name="email" type="email" autocomplete="email"></div>
+              <div><label for="m-name">Name</label><input id="m-name" name="name" required autocomplete="name"></div>
+              <div><label for="m-email">Email</label><input id="m-email" name="email" type="email" autocomplete="email"></div>
             </div>
             <label for="m-subject">Subject</label><input id="m-subject" name="subject" placeholder="Optional">
             <label for="m-msg">Message</label><textarea id="m-msg" name="message" required></textarea>
-            <div class="actions"><span class="sign">Opens in your mail app</span><button class="moda-btn" type="submit">Seal &amp; send</button></div>
+            <div class="actions"><span class="sign">Opens in a mail app</span><button class="moda-btn" type="submit">Seal &amp; send</button></div>
           </form>
-          <div class="sent"><b>Your letter's on its way.</b><p>Your mail app opened with it ready. Just hit send.</p>
+          <div class="sent"><b>The letter's ready to go.</b><p>A mail app has opened with it filled in. Press send there to post it.</p>
             <button class="again" type="button">Write another</button></div>
         </div>
       </div>
