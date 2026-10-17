@@ -78,8 +78,8 @@ def trends_page():
     has_vogue = trends.vogue_available()
     with st.sidebar:
         source = st.radio("Source", [VOGUE, COMMONS] if has_vogue else [COMMONS],
-                          help="Vogue: ~25k designer shows 1988–2024, scored from CLIP embeddings (photos never shown). "
-                               "Commons: openly licensed photos incl. 2025–26, scored with FashionCLIP.")
+                          help="Vogue Runway archive: ~20,000 ready-to-wear and couture shows (1988–2023), scored by a vision "
+                               "model; photos load from Vogue. Commons: openly licensed photos through 2026, scored with FashionCLIP.")
         if source == VOGUE:
             categories = st.multiselect("Collections", COLLECTIONS, default=["Ready-to-Wear", "Couture"])
         else:
@@ -107,9 +107,9 @@ def trends_page():
         shows = cached_vogue(group, tuple(categories))
         share = trends.vogue_yearly_share(shows, min_n)
         span = f"{share.index.min()}–{share.index.max()}" if len(share) else "1988–2024"
-        v = trends.vogue_summary(shows[shows.show_year.isin(share.index)])
-        cards = [(ui.count(v["looks"]), "Runway looks", "scored by CLIP"),
-                 (ui.count(v["shows"]), "Shows", f"{v['designers']:,} designers"),
+        v = trends.vogue_summary(shows)  # whole archive, same totals as the Findings page
+        cards = [(ui.count(v["shows"]), "Designer shows", f"{v['designers']:,} houses in the Vogue Runway archive"),
+                 (ui.count(v["looks"]), "Runway looks", "each one scored by a vision model"),
                  (ui.count(len(share)), "Years with enough data", span)]
         note = ui.vogue_note()
         unit = "shows"
