@@ -12,25 +12,6 @@ Wikimedia Commons ──► ingest.py ──► SQLite + thumbnails
                                trends.py ──► app.py (Streamlit dashboard)
 ```
 
-## Run it
-
-```bash
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-export RUNWAY_CONTACT="you@example.com"        # Wikimedia asks scrapers for contact info
-.venv/bin/python -m runway.ingest --years 2007-2026 --per-year 200   # ~1h, rate-limited
-.venv/bin/python -m runway.tag                 # FashionCLIP on Apple GPU / CUDA / CPU
-.venv/bin/streamlit run app.py
-```
-
-**Vogue Runway archive (optional, main source):** download two files from the Internet Archive item
-`VogueRunway_dataset` into `data/vogue/` (`VogueRunway.parquet`, 99 MB, and `img_emb/VogueRunway_image.npy`, 1.3 GB),
-then:
-
-```bash
-.venv/bin/python -m runway.vogue check    # embeddings line up with metadata?
-.venv/bin/python -m runway.vogue build    # ~1 min: per-show shares for ~20k shows, 1999–2023
-```
-
 That dataset was scraped from vogue.com and has no license. Moda scores its CLIP embeddings and metadata and never
 downloads the photos. The gallery hotlinks Vogue's own image URLs, credited to Vogue Runway, with each look linked to
 its collection.
