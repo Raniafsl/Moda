@@ -198,7 +198,7 @@ def cached_compare(group: str, label: str) -> dict | None:
 def season_chart(r: dict, height: int = 320) -> alt.Chart:
     kind, year = r["kind"], r["year"]
     hist = r["series"].assign(season=lambda d: kind + " " + d.year.astype(str),
-                              which=lambda d: d.origin.map({"vogue": "history", "saved": "saved"}))
+                              which=lambda d: d.origin.map({"vogue": "history", "saved": "saved", "partial": "partial"}))
     now = pd.DataFrame({"year": [year], "share": [r["latest"]], "houses": [r["n_shows"]],
                         "season": [f"{kind} {year}"], "which": ["latest"]})
     # Empty slots for seasons with no data, so the gap before the latest season is visible.
@@ -211,8 +211,8 @@ def season_chart(r: dict, height: int = 320) -> alt.Chart:
         .encode(
             x=alt.X("season:N", sort=list(df.season), title=None, axis=alt.Axis(labelAngle=-45)),
             y=alt.Y("share:Q", title=None, axis=alt.Axis(format="%", tickCount=5)),
-            color=alt.Color("which:N", scale=alt.Scale(domain=["history", "saved", "latest"],
-                                                       range=["#DCD3C8", "#C99A92", ui.PRIMARY]), legend=None),
+            color=alt.Color("which:N", scale=alt.Scale(domain=["history", "saved", "partial", "latest"],
+                                                       range=["#DCD3C8", "#C99A92", "#E8CFCA", ui.PRIMARY]), legend=None),
             tooltip=[alt.Tooltip("season:N"), alt.Tooltip("share:Q", format=".1%"), alt.Tooltip("houses:Q", title="houses")],
         )
         .properties(height=height)
@@ -277,15 +277,17 @@ def latest_page():
                   else "little change since last season")
         bits.append(f"Same {len(p['houses'])} houses year on year: {p['prev']:.1%} in {p['season']} → {p['now']:.1%} now "
                     f"(×{p['lift']:.2f}, {p['up']} up, {p['down']} down) - {change}.")
-    bits.append(f"Based on a hand-collected sample of {r['n_shows']} shows; more will be added as the season is collected.")
+    bits.append(f"Based on a hand-collected sample of {r['n_shows']} shows.")
     st.html(ui.note(" ".join(bits)))
 
     if (acc := accuracy.reliability(group, pick)) and acc["precision"] < 0.75:
         st.html(ui.note(f"Accuracy check: when Moda labels a look ‘{name}’, it was right {acc['precision']:.0%} of the "
                         f"time ({int(acc['yes'])} of {int(acc['n'])} checked). Treat this label's numbers with caution."))
 
-    saved_note = (f" Rose bars ({', '.join(f'{kind} {y}' for y in r['saved_years'])}) are hand-collected seasons; "
-                  "grey bars come from the Vogue archive." if r.get("saved_years") else "")
+    part = r["series"][r["series"].origin == "partial"]
+    saved_note = (f" Rose bars are hand-collected seasons; grey bars come from the Vogue archive." if r.get("saved_years") else "")
+    saved_note += "".join(f" The pale {kind} {int(y)} bar covers only {int(n)} of these {r['n_shows']} houses, so read it as indicative."
+                          for y, n in zip(part.year, part.houses))
     st.html(ui.section(f"Same houses, every {kind}", f"{name} across {kind} seasons",
                        "Each bar averages the houses that showed that season (at least half of them)." + saved_note))
     st.altair_chart(season_chart(r), use_container_width=True)

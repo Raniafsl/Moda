@@ -175,9 +175,14 @@ def compare(group: str, label: str, recent: int = 5, min_share: float = 0.02) ->
     keys = set().union(*({norm(d)} | ALIASES.get(norm(d), set()) for d in now.index))
     same = hist_all[hist_all.key.isin(keys)]
     per_year = same.groupby(["year", "label"]).agg(share=("share", "mean"), houses=("key", "nunique")).reset_index()
-    per_year = per_year[per_year.houses >= max(2, len(now) // 2)]
     origin = same.groupby("year").origin.agg(lambda o: "saved" if (o == "saved").any() else "vogue").rename("origin")
-    series = per_year[per_year.label == label][["year", "share", "houses"]].merge(origin, left_on="year", right_index=True)
+    per_year = per_year.merge(origin, left_on="year", right_index=True)
+    # Archive seasons need half of these houses. Hand-collected seasons may chart with a third,
+    # marked 'partial' so the chart can show them lighter and the note can say so.
+    half, third = max(2, len(now) // 2), max(3, len(now) // 3)
+    per_year = per_year[(per_year.houses >= half) | ((per_year.origin == "saved") & (per_year.houses >= third))]
+    per_year.loc[(per_year.origin == "saved") & (per_year.houses < half), "origin"] = "partial"
+    series = per_year[per_year.label == label][["year", "share", "houses", "origin"]]
 
     latest = now.mean()
     # The headline baseline is the archive's last season; saved seasons get their own year-on-year comparison.

@@ -138,6 +138,7 @@ DESIGNERS = {
     "bottega": "Bottega Veneta", "bottega veneta": "Bottega Veneta", "bottegaveneta": "Bottega Veneta",
 }
 FOLDER_RE = re.compile(r"^(?P<name>.+?)[\s_-]+(?P<couture>couture[\s_-]+)?(?P<kind>ss|fw|aw|resort|prefall|pre-fall|spring|fall)[\s_-]?(?P<yy>\d{4}|\d{2})(?P<rest>.*)$", re.I)
+COUTURE_FILE = re.compile(r"[a-z]c(?:ss|fw|aw)\d{2}\d")
 KIND_WORD = {"ss": "Spring", "spring": "Spring", "fw": "Fall", "aw": "Fall", "fall": "Fall",
              "resort": "Resort", "prefall": "Pre-Fall", "pre-fall": "Pre-Fall"}
 
@@ -191,22 +192,26 @@ def import_downloads(root: Path, credit: str = "Tagwalk", dry_run: bool = False)
         if not parsed:
             continue
         house, season = parsed
-        by_house: dict[str, list[Path]] = {}
+        # Decide per file, not per folder: one folder can hold a couture show and a ready-to-wear show.
+        # Tagwalk marks couture with a 'c' before the season ('valentinocss25…' vs 'valentinoss27…').
+        by_house: dict[tuple[str, str], list[Path]] = {}
         for f in folder.iterdir():
-            if f.suffix.lower() in EXTS:
-                by_house.setdefault(file_designer(f.name, slugs) or house, []).append(f)
-        for who, files in sorted(by_house.items()):
+            if f.suffix.lower() not in EXTS:
+                continue
+            file_season = season.replace("Ready-to-Wear", "Couture") if COUTURE_FILE.search(f.name.lower()) else season
+            by_house.setdefault((file_designer(f.name, slugs) or house, file_season), []).append(f)
+        for (who, show_season), files in sorted(by_house.items()):
             moved = "" if who == house else f"  (found in '{folder.name}', filed under {who})"
             if dry_run:
-                print(f"  {who:20s} {season:28s} {len(files):3d} looks{moved}")
+                print(f"  {who:20s} {show_season:28s} {len(files):3d} looks{moved}")
                 continue
             with tempfile.TemporaryDirectory() as tmp:  # links only - your folders are never changed
                 for f in files:
                     (Path(tmp) / f.name).symlink_to(f)
-                added, skipped = import_folder(conn, Path(tmp), who, season, vogue_url(who, season), credit)
+                added, skipped = import_folder(conn, Path(tmp), who, show_season, vogue_url(who, show_season), credit)
             total += added
             if added or moved:
-                print(f"  {who:20s} {season:28s} +{added} new, {skipped} already in{moved}")
+                print(f"  {who:20s} {show_season:28s} +{added} new, {skipped} already in{moved}")
     if not dry_run:
         print(f"Imported {total} new looks. Run `python -m runway.tag` next.")
 
