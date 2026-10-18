@@ -34,7 +34,6 @@ its collection.
 - **Sampling bias.** Commons only covers shows that volunteers photographed and uploaded.
   It skews toward some weeks and designers, and it's thin for 2020–21.
 - **Zero-shot labels are noisy.** Text prompts are only a stand-in for real categories.
-  Hand-label ~200 looks and report precision per label to measure that.
 - **One "year" mixes seasons.** Spring/Summer and Fall/Winter can be split out of category names.
 
 ## Next steps
